@@ -217,6 +217,19 @@ button:disabled {
   color: #5c6d61;
 }
 
+.deadline {
+  width: fit-content;
+}
+
+.deadline.due-soon {
+  border: 1px solid #e2b53b;
+  border-radius: 8px;
+  background: #fff4c7;
+  color: #6a4b00;
+  padding: 5px 8px;
+  font-weight: 700;
+}
+
 .job-tags {
   display: flex;
   flex-wrap: wrap;

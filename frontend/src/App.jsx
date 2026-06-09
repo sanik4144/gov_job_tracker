@@ -70,7 +70,7 @@ export function App() {
       setSelectedKeyword(nextSelected);
       await loadKeywords();
       await loadJobs(nextSelected);
-      setStatus(`Removed keyword: ${value}`);
+      setStatus(`Removed ${value}. Deleted ${data.deletedJobs || 0} saved jobs.`);
     } catch (error) {
       setStatus(error.message);
     }
@@ -128,7 +128,7 @@ export function App() {
         </div>
 
         <div className="actions">
-          <button type="button" onClick={loadJobs} disabled={loading} title="Refresh jobs">
+          <button type="button" onClick={() => loadJobs()} disabled={loading} title="Refresh jobs">
             <RefreshCcw size={18} />
             Refresh
           </button>
@@ -213,7 +213,12 @@ export function App() {
               <div>
                 <h2>{job.title}</h2>
                 <p>{job.organization || "AllJobs by Teletalk"}</p>
-                {job.deadline && <span>Deadline: {job.deadline}</span>}
+                {job.deadline && (
+                  <span className={job.isDueSoon ? "deadline due-soon" : "deadline"}>
+                    Deadline: {job.deadline}
+                    {job.isDueSoon && " - Due soon"}
+                  </span>
+                )}
                 {job.keywords?.length > 0 && (
                   <div className="job-tags">
                     {job.keywords.map((keyword) => (

@@ -30,6 +30,42 @@ function normalizeKeyword(value = "") {
   return value.trim().toLowerCase();
 }
 
+function getTodayUtcDateOnly() {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+}
+
+function getDeadlineMeta(deadline) {
+  if (!deadline) {
+    return {
+      deadlineTime: Number.MAX_SAFE_INTEGER,
+      isExpired: false,
+      isDueSoon: false,
+      daysUntilDeadline: null,
+    };
+  }
+
+  const parsed = new Date(`${deadline}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return {
+      deadlineTime: Number.MAX_SAFE_INTEGER,
+      isExpired: false,
+      isDueSoon: false,
+      daysUntilDeadline: null,
+    };
+  }
+
+  const diffMs = parsed.getTime() - getTodayUtcDateOnly().getTime();
+  const daysUntilDeadline = Math.ceil(diffMs / 86400000);
+
+  return {
+    deadlineTime: parsed.getTime(),
+    isExpired: daysUntilDeadline < 0,
+    isDueSoon: daysUntilDeadline >= 0 && daysUntilDeadline <= 2,
+    daysUntilDeadline,
+  };
+}
+
 app.get("/api/keywords", async (_req, res, next) => {
   try {
     await ensureDefaultKeyword();
@@ -60,14 +96,23 @@ app.post("/api/keywords", async (req, res, next) => {
 
 app.delete("/api/keywords/:id", async (req, res, next) => {
   try {
-    const keyword = await Keyword.findByIdAndUpdate(
-      req.params.id,
-      { active: false },
-      { new: true }
-    );
+    const keyword = await Keyword.findByIdAndDelete(req.params.id);
 
     if (!keyword) return res.status(404).json({ error: "Keyword not found" });
-    res.json({ keyword });
+
+    const pulled = await Job.updateMany(
+      { keywords: keyword.value },
+      { $pull: { keywords: keyword.value } }
+    );
+    const deletedJobs = await Job.deleteMany({
+      $or: [{ keywords: { $exists: false } }, { keywords: { $size: 0 } }],
+    });
+
+    res.json({
+      keyword,
+      affectedJobs: pulled.modifiedCount,
+      deletedJobs: deletedJobs.deletedCount,
+    });
   } catch (error) {
     next(error);
   }
@@ -80,8 +125,18 @@ app.get("/api/jobs", async (req, res, next) => {
       filter.keywords = String(req.query.keyword);
     }
 
-    const jobs = await Job.find(filter).sort({ createdAt: -1 }).limit(100);
-    res.json({ jobs });
+    const jobs = await Job.find(filter).lean();
+    const activeJobs = jobs
+      .map((job) => {
+        const deadlineMeta = getDeadlineMeta(job.deadline);
+        return { ...job, ...deadlineMeta };
+      })
+      .filter((job) => !job.isExpired)
+      .sort((a, b) => a.deadlineTime - b.deadlineTime || a.title.localeCompare(b.title))
+      .slice(0, 100)
+      .map(({ deadlineTime, isExpired, ...job }) => job);
+
+    res.json({ jobs: activeJobs });
   } catch (error) {
     next(error);
   }
