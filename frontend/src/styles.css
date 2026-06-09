@@ -1,0 +1,183 @@
+:root {
+  color: #17211b;
+  background: #f5f7f4;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #d9e1da;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 1;
+}
+
+.toolbar p {
+  margin-top: 8px;
+  color: #5c6d61;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+button {
+  min-height: 42px;
+  border: 1px solid #aab8ad;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17211b;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+button:last-child {
+  border-color: #276d4d;
+  background: #276d4d;
+  color: #ffffff;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.metrics div {
+  border: 1px solid #d9e1da;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.metrics span {
+  display: block;
+  color: #627068;
+  font-size: 14px;
+}
+
+.metrics strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 22px;
+}
+
+.status {
+  margin-bottom: 16px;
+  border-left: 4px solid #276d4d;
+  background: #e8f1eb;
+  padding: 12px 14px;
+  color: #244633;
+}
+
+.job-list {
+  display: grid;
+  gap: 12px;
+}
+
+.job-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid #d9e1da;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 18px;
+}
+
+.job-card h2 {
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.job-card p,
+.job-card span {
+  display: block;
+  margin-top: 6px;
+  color: #5c6d61;
+}
+
+.job-card a {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  color: #276d4d;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.empty {
+  min-height: 220px;
+  border: 1px dashed #aab8ad;
+  border-radius: 8px;
+  color: #5c6d61;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .actions,
+  button {
+    width: 100%;
+  }
+
+  button {
+    justify-content: center;
+  }
+}
