@@ -3,7 +3,8 @@ import cors from "cors";
 import { env, requireEnv } from "./config/env.js";
 import { connectDb } from "./db.js";
 import { Job } from "./models/Job.js";
-import { runDailyJobCheck } from "./services/notifier.js";
+import { Keyword } from "./models/Keyword.js";
+import { ensureDefaultKeyword, runDailyJobCheck } from "./services/notifier.js";
 import { startScheduler } from "./scheduler.js";
 
 requireEnv();
@@ -25,9 +26,61 @@ app.get("/health", (_req, res) => {
   });
 });
 
-app.get("/api/jobs", async (_req, res, next) => {
+function normalizeKeyword(value = "") {
+  return value.trim().toLowerCase();
+}
+
+app.get("/api/keywords", async (_req, res, next) => {
   try {
-    const jobs = await Job.find().sort({ createdAt: -1 }).limit(50);
+    await ensureDefaultKeyword();
+    const keywords = await Keyword.find({ active: true }).sort({ value: 1 });
+    res.json({ keywords });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/keywords", async (req, res, next) => {
+  try {
+    const value = String(req.body?.value || "").trim();
+    if (!value) return res.status(400).json({ error: "Keyword is required" });
+
+    const normalizedValue = normalizeKeyword(value);
+    const keyword = await Keyword.findOneAndUpdate(
+      { normalizedValue },
+      { value, normalizedValue, active: true },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    res.status(201).json({ keyword });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/keywords/:id", async (req, res, next) => {
+  try {
+    const keyword = await Keyword.findByIdAndUpdate(
+      req.params.id,
+      { active: false },
+      { new: true }
+    );
+
+    if (!keyword) return res.status(404).json({ error: "Keyword not found" });
+    res.json({ keyword });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/jobs", async (req, res, next) => {
+  try {
+    const filter = {};
+    if (req.query.keyword) {
+      filter.keywords = String(req.query.keyword);
+    }
+
+    const jobs = await Job.find(filter).sort({ createdAt: -1 }).limit(100);
     res.json({ jobs });
   } catch (error) {
     next(error);

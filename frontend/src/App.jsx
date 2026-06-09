@@ -1,26 +1,84 @@
 import { useEffect, useState } from "react";
-import { Bell, ExternalLink, RefreshCcw, Search } from "lucide-react";
+import { Bell, ExternalLink, Plus, RefreshCcw, Search, X } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 const CRON_SECRET = import.meta.env.VITE_CRON_SECRET || "";
 
 export function App() {
   const [jobs, setJobs] = useState([]);
+  const [keywords, setKeywords] = useState([]);
+  const [selectedKeyword, setSelectedKeyword] = useState("");
+  const [newKeyword, setNewKeyword] = useState("");
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState("");
 
-  async function loadJobs() {
+  async function loadKeywords() {
+    const response = await fetch(`${API_BASE_URL}/api/keywords`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not load keywords");
+    setKeywords(data.keywords || []);
+  }
+
+  async function loadJobs(keyword = selectedKeyword) {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/jobs`);
+      const query = keyword ? `?keyword=${encodeURIComponent(keyword)}` : "";
+      const response = await fetch(`${API_BASE_URL}/api/jobs${query}`);
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not load jobs");
       setJobs(data.jobs || []);
     } catch (error) {
       setStatus(error.message);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function addKeyword(event) {
+    event.preventDefault();
+    const value = newKeyword.trim();
+    if (!value) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/keywords`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not save keyword");
+      setNewKeyword("");
+      setSelectedKeyword(data.keyword.value);
+      await loadKeywords();
+      await loadJobs(data.keyword.value);
+      setStatus(`Saved keyword: ${data.keyword.value}`);
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function removeKeyword(id, value) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/keywords/${id}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not remove keyword");
+
+      const nextSelected = selectedKeyword === value ? "" : selectedKeyword;
+      setSelectedKeyword(nextSelected);
+      await loadKeywords();
+      await loadJobs(nextSelected);
+      setStatus(`Removed keyword: ${value}`);
+    } catch (error) {
+      setStatus(error.message);
+    }
+  }
+
+  async function selectKeyword(value) {
+    setSelectedKeyword(value);
+    await loadJobs(value);
   }
 
   async function runCheck() {
@@ -37,7 +95,8 @@ export function App() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Check failed");
-      setStatus(`Checked ${data.found} jobs. New: ${data.new}.`);
+      setStatus(`Checked ${data.found} jobs for ${data.keywords.length} keywords. New: ${data.new}.`);
+      await loadKeywords();
       await loadJobs();
     } catch (error) {
       setStatus(error.message);
@@ -47,7 +106,17 @@ export function App() {
   }
 
   useEffect(() => {
-    loadJobs();
+    async function boot() {
+      try {
+        await loadKeywords();
+        await loadJobs("");
+      } catch (error) {
+        setStatus(error.message);
+        setLoading(false);
+      }
+    }
+
+    boot();
   }, []);
 
   return (
@@ -55,7 +124,7 @@ export function App() {
       <section className="toolbar">
         <div>
           <h1>Gov Job Tracker</h1>
-          <p>Assistant Programmer alerts from AllJobs by Teletalk</p>
+          <p>Daily government job alerts from AllJobs by Teletalk</p>
         </div>
 
         <div className="actions">
@@ -76,8 +145,8 @@ export function App() {
           <strong>{jobs.length}</strong>
         </div>
         <div>
-          <span>Keyword</span>
-          <strong>Assistant Programmer</strong>
+          <span>Keywords</span>
+          <strong>{keywords.length}</strong>
         </div>
         <div>
           <span>Schedule</span>
@@ -86,6 +155,46 @@ export function App() {
       </section>
 
       {status && <p className="status">{status}</p>}
+
+      <section className="keyword-panel">
+        <form onSubmit={addKeyword}>
+          <Search size={18} />
+          <input
+            value={newKeyword}
+            onChange={(event) => setNewKeyword(event.target.value)}
+            placeholder="Add a job title keyword"
+          />
+          <button type="submit" title="Add keyword">
+            <Plus size={18} />
+            Add
+          </button>
+        </form>
+
+        <div className="keyword-chips">
+          <button
+            type="button"
+            className={!selectedKeyword ? "active" : ""}
+            onClick={() => selectKeyword("")}
+          >
+            All
+          </button>
+
+          {keywords.map((keyword) => (
+            <span className={selectedKeyword === keyword.value ? "keyword-chip active" : "keyword-chip"} key={keyword._id}>
+              <button type="button" onClick={() => selectKeyword(keyword.value)}>
+                {keyword.value}
+              </button>
+              <button
+                type="button"
+                onClick={() => removeKeyword(keyword._id, keyword.value)}
+                title={`Remove ${keyword.value}`}
+              >
+                <X size={14} />
+              </button>
+            </span>
+          ))}
+        </div>
+      </section>
 
       <section className="job-list" aria-busy={loading}>
         {loading ? (
@@ -105,6 +214,13 @@ export function App() {
                 <h2>{job.title}</h2>
                 <p>{job.organization || "AllJobs by Teletalk"}</p>
                 {job.deadline && <span>Deadline: {job.deadline}</span>}
+                {job.keywords?.length > 0 && (
+                  <div className="job-tags">
+                    {job.keywords.map((keyword) => (
+                      <span key={keyword}>{keyword}</span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {job.detailUrl && (

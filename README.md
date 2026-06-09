@@ -1,11 +1,15 @@
 # Gov Job Tracker
 
-Daily Telegram alerts for Assistant Programmer jobs from AllJobs by Teletalk.
+Daily Telegram alerts for saved government job title keywords from AllJobs by Teletalk.
 
 ## Structure
 
 - `backend` - Express API, MongoDB storage, Teletalk scraper, Telegram sender, scheduler
 - `frontend` - React dashboard for viewing saved jobs and manually running a check
+
+## Keywords
+
+`JOB_KEYWORD` seeds the first keyword, currently `Assistant Programmer`. After that, keywords are managed from the frontend and saved in MongoDB. A daily check scans all active keywords, tags each saved job with its matched keyword, and sends one Telegram digest grouped by keyword.
 
 ## Render Free Tier Note
 

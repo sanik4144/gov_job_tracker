@@ -1,4 +1,6 @@
 import { Job } from "../models/Job.js";
+import { Keyword } from "../models/Keyword.js";
+import { env } from "../config/env.js";
 import { fetchJobs } from "./scraper.js";
 import { sendTelegramMessage } from "./telegram.js";
 
@@ -9,22 +11,64 @@ function escapeHtml(value = "") {
     .replaceAll(">", "&gt;");
 }
 
-function formatJobMessage(job) {
+function normalizeKeyword(value) {
+  return value.trim().toLowerCase();
+}
+
+export async function ensureDefaultKeyword() {
+  const value = env.jobKeyword;
+  await Keyword.updateOne(
+    { normalizedValue: normalizeKeyword(value) },
+    {
+      $setOnInsert: {
+        value,
+        normalizedValue: normalizeKeyword(value),
+        active: true,
+      },
+    },
+    { upsert: true }
+  );
+}
+
+export async function getActiveKeywords() {
+  await ensureDefaultKeyword();
+  const keywords = await Keyword.find({ active: true }).sort({ value: 1 }).lean();
+  return keywords.map((keyword) => keyword.value);
+}
+
+function formatGroupedDigest(newJobs, keywords) {
   const lines = [
-    "<b>New government job found</b>",
+    "<b>Government Job Tracker</b>",
     "",
-    `<b>Post:</b> ${escapeHtml(job.title)}`,
+    `<b>New jobs:</b> ${newJobs.length}`,
   ];
 
-  if (job.organization) lines.push(`<b>Organization:</b> ${escapeHtml(job.organization)}`);
-  if (job.deadline) lines.push(`<b>Deadline:</b> ${escapeHtml(job.deadline)}`);
-  if (job.detailUrl) lines.push(`<b>Details:</b> ${escapeHtml(job.detailUrl)}`);
+  if (newJobs.length === 0) {
+    lines.push("", `No new jobs found for: ${escapeHtml(keywords.join(", "))}`);
+    return lines.join("\n");
+  }
+
+  for (const keyword of keywords) {
+    const keywordJobs = newJobs.filter((job) => job.keywords?.includes(keyword));
+    if (keywordJobs.length === 0) continue;
+
+    lines.push("", `<b>${escapeHtml(keyword)}</b>`);
+
+    for (const job of keywordJobs) {
+      lines.push(
+        `- ${escapeHtml(job.title)}${job.organization ? `, ${escapeHtml(job.organization)}` : ""}`
+      );
+      if (job.deadline) lines.push(`  Deadline: ${escapeHtml(job.deadline)}`);
+      if (job.detailUrl) lines.push(`  ${escapeHtml(job.detailUrl)}`);
+    }
+  }
 
   return lines.join("\n");
 }
 
 export async function runDailyJobCheck({ notify = true } = {}) {
-  const scrapedJobs = await fetchJobs();
+  const keywords = await getActiveKeywords();
+  const scrapedJobs = await fetchJobs(keywords);
   const newJobs = [];
 
   for (const scrapedJob of scrapedJobs) {
@@ -32,6 +76,7 @@ export async function runDailyJobCheck({ notify = true } = {}) {
 
     if (existing) {
       existing.lastSeenAt = new Date();
+      existing.keywords = [...new Set([...(existing.keywords || []), ...scrapedJob.keywords])];
       await existing.save();
       continue;
     }
@@ -41,19 +86,20 @@ export async function runDailyJobCheck({ notify = true } = {}) {
   }
 
   if (notify) {
-    for (const job of newJobs) {
-      await sendTelegramMessage(formatJobMessage(job));
-      job.notifiedAt = new Date();
-      await job.save();
+    if (newJobs.length > 0) {
+      const notifiedAt = new Date();
+      for (const job of newJobs) {
+        job.notifiedAt = notifiedAt;
+        await job.save();
+      }
     }
 
-    if (newJobs.length === 0) {
-      await sendTelegramMessage("No new Assistant Programmer jobs found today.");
-    }
+    await sendTelegramMessage(formatGroupedDigest(newJobs, keywords));
   }
 
   return {
     checkedAt: new Date().toISOString(),
+    keywords,
     found: scrapedJobs.length,
     new: newJobs.length,
     jobs: newJobs,

@@ -68,7 +68,8 @@ button {
   cursor: pointer;
 }
 
-button:last-child {
+.actions button:last-child,
+.keyword-panel form button {
   border-color: #276d4d;
   background: #276d4d;
   color: #ffffff;
@@ -113,6 +114,81 @@ button:disabled {
   color: #244633;
 }
 
+.keyword-panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.keyword-panel form {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #d9e1da;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.keyword-panel input {
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  outline: 0;
+  color: #17211b;
+  font: inherit;
+}
+
+.keyword-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.keyword-chips > button,
+.keyword-chip {
+  min-height: 34px;
+  border: 1px solid #bfcbc2;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334139;
+  display: inline-flex;
+  align-items: center;
+}
+
+.keyword-chips > button {
+  padding: 0 12px;
+}
+
+.keyword-chip button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 10px;
+}
+
+.keyword-chip button:first-child {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keyword-chip button:last-child {
+  width: 32px;
+  justify-content: center;
+  padding: 0;
+}
+
+.keyword-chips .active,
+.keyword-chip.active {
+  border-color: #276d4d;
+  background: #e8f1eb;
+  color: #244633;
+}
+
 .job-list {
   display: grid;
   gap: 12px;
@@ -139,6 +215,22 @@ button:disabled {
   display: block;
   margin-top: 6px;
   color: #5c6d61;
+}
+
+.job-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.job-tags span {
+  margin: 0;
+  border-radius: 8px;
+  background: #eef4f0;
+  color: #244633;
+  padding: 4px 8px;
+  font-size: 13px;
 }
 
 .job-card a {
@@ -173,8 +265,17 @@ button:disabled {
   }
 
   .actions,
+  .keyword-panel form,
   button {
     width: 100%;
+  }
+
+  .keyword-panel form {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .keyword-panel form button {
+    grid-column: 1 / -1;
   }
 
   button {

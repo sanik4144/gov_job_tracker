@@ -43,13 +43,15 @@ async function fetchGovtJobDetails(jobId) {
   return response.data?.details || null;
 }
 
-function matchesKeyword(job) {
-  const keyword = env.jobKeyword.toLowerCase();
+function findMatchedKeywords(job, keywords) {
   const title = normalizeText(job?.job_title).toLowerCase();
-  return title.includes(keyword);
+  return keywords.filter((keyword) => title.includes(keyword.toLowerCase()));
 }
 
-export async function fetchJobs() {
+export async function fetchJobs(keywords = [env.jobKeyword]) {
+  const activeKeywords = [...new Set(keywords.map(normalizeText).filter(Boolean))];
+  if (activeKeywords.length === 0) return [];
+
   const byId = new Map();
   const limit = 20;
   let page = 1;
@@ -63,7 +65,8 @@ export async function fetchJobs() {
 
     for (const org of orgJobs) {
       for (const job of org.govt_jobs || []) {
-        if (!matchesKeyword(job)) continue;
+        const matchedKeywords = findMatchedKeywords(job, activeKeywords);
+        if (matchedKeywords.length === 0) continue;
 
         const details = await fetchGovtJobDetails(job.id);
         const title = normalizeText(details?.job_title || job.job_title);
@@ -80,6 +83,7 @@ export async function fetchJobs() {
           deadline: formatDate(details?.deadline_date),
           detailUrl,
           sourceUrl: env.jobSearchUrl,
+          keywords: matchedKeywords,
           rawText: normalizeText(
             [
               title,

@@ -20,6 +20,11 @@ const jobSchema = new mongoose.Schema(
       required: true,
     },
     rawText: String,
+    keywords: {
+      type: [String],
+      default: [],
+      index: true,
+    },
     firstSeenAt: {
       type: Date,
       default: Date.now,
