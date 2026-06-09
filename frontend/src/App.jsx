@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, ExternalLink, Plus, RefreshCcw, Search, X } from "lucide-react";
+import { Bell, Check, ExternalLink, Plus, RefreshCcw, Search, X } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 const CRON_SECRET = import.meta.env.VITE_CRON_SECRET || "";
@@ -79,6 +79,28 @@ export function App() {
   async function selectKeyword(value) {
     setSelectedKeyword(value);
     await loadJobs(value);
+  }
+
+  async function toggleApplied(job) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/jobs/${job._id}/applied`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applied: !job.applied }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update applied status");
+
+      setJobs((currentJobs) =>
+        currentJobs.map((currentJob) =>
+          currentJob._id === job._id
+            ? { ...currentJob, applied: data.job.applied, appliedAt: data.job.appliedAt }
+            : currentJob
+        )
+      );
+    } catch (error) {
+      setStatus(error.message);
+    }
   }
 
   async function runCheck() {
@@ -209,14 +231,14 @@ export function App() {
           </div>
         ) : (
           jobs.map((job) => (
-            <article className="job-card" key={job._id}>
+            <article className={job.applied ? "job-card applied" : "job-card"} key={job._id}>
               <div>
                 <h2>{job.title}</h2>
                 <p>{job.organization || "AllJobs by Teletalk"}</p>
                 {job.deadline && (
-                  <span className={job.isDueSoon ? "deadline due-soon" : "deadline"}>
+                  <span className="deadline">
                     Deadline: {job.deadline}
-                    {job.isDueSoon && " - Due soon"}
+                    {job.isDueSoon && <span className="deadline-dot" aria-label="Deadline in 2 days" />}
                   </span>
                 )}
                 {job.keywords?.length > 0 && (
@@ -228,11 +250,22 @@ export function App() {
                 )}
               </div>
 
-              {job.detailUrl && (
-                <a href={job.detailUrl} target="_blank" rel="noreferrer" title="Open job details">
-                  <ExternalLink size={18} />
-                </a>
-              )}
+              <div className="job-actions">
+                <button
+                  type="button"
+                  className={job.applied ? "applied-toggle active" : "applied-toggle"}
+                  onClick={() => toggleApplied(job)}
+                  title={job.applied ? "Mark not applied" : "Mark applied"}
+                >
+                  <Check size={18} />
+                </button>
+
+                {job.detailUrl && (
+                  <a href={job.detailUrl} target="_blank" rel="noreferrer" title="Open job details">
+                    <ExternalLink size={18} />
+                  </a>
+                )}
+              </div>
             </article>
           ))
         )}

@@ -205,6 +205,11 @@ button:disabled {
   padding: 18px;
 }
 
+.job-card.applied {
+  border-color: #a7c9b7;
+  background: #f7fbf8;
+}
+
 .job-card h2 {
   font-size: 18px;
   line-height: 1.25;
@@ -217,17 +222,40 @@ button:disabled {
   color: #5c6d61;
 }
 
-.deadline {
+.job-card .deadline {
   width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.deadline.due-soon {
-  border: 1px solid #e2b53b;
-  border-radius: 8px;
-  background: #fff4c7;
-  color: #6a4b00;
-  padding: 5px 8px;
-  font-weight: 700;
+.job-card .deadline-dot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  margin: 0;
+  border-radius: 999px;
+  background: #e2b53b;
+  box-shadow: 0 0 0 0 rgba(226, 181, 59, 0.6);
+  animation: deadline-pulse 1.4s ease-out infinite;
+}
+
+@keyframes deadline-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(226, 181, 59, 0.6);
+    opacity: 1;
+  }
+
+  70% {
+    box-shadow: 0 0 0 7px rgba(226, 181, 59, 0);
+    opacity: 0.65;
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(226, 181, 59, 0);
+    opacity: 1;
+  }
 }
 
 .job-tags {
@@ -246,14 +274,37 @@ button:disabled {
   font-size: 13px;
 }
 
-.job-card a {
+.job-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.job-card a,
+.applied-toggle {
   width: 42px;
   height: 42px;
   border-radius: 8px;
-  color: #276d4d;
   display: grid;
   place-items: center;
+}
+
+.job-card a {
+  color: #276d4d;
   flex: 0 0 auto;
+}
+
+.applied-toggle {
+  border-color: #aab8ad;
+  color: #5c6d61;
+  padding: 0;
+}
+
+.applied-toggle.active {
+  border-color: #276d4d;
+  background: #276d4d;
+  color: #ffffff;
 }
 
 .empty {
@@ -293,5 +344,9 @@ button:disabled {
 
   button {
     justify-content: center;
+  }
+
+  .job-actions {
+    align-self: stretch;
   }
 }

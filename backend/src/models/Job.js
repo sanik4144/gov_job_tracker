@@ -34,6 +34,12 @@ const jobSchema = new mongoose.Schema(
       default: Date.now,
     },
     notifiedAt: Date,
+    applied: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    appliedAt: Date,
   },
   { timestamps: true }
 );

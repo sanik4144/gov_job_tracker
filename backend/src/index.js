@@ -142,6 +142,25 @@ app.get("/api/jobs", async (req, res, next) => {
   }
 });
 
+app.patch("/api/jobs/:id/applied", async (req, res, next) => {
+  try {
+    const applied = Boolean(req.body?.applied);
+    const job = await Job.findByIdAndUpdate(
+      req.params.id,
+      {
+        applied,
+        appliedAt: applied ? new Date() : null,
+      },
+      { new: true }
+    );
+
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    res.json({ job });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/run-daily", async (req, res, next) => {
   try {
     if (env.cronSecret && req.header("x-cron-secret") !== env.cronSecret) {
