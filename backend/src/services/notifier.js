@@ -5,7 +5,7 @@ import { fetchJobs } from "./scraper.js";
 import { sendTelegramMessage } from "./telegram.js";
 
 function escapeHtml(value = "") {
-  return value
+  return String(value || "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
@@ -37,6 +37,7 @@ export async function getActiveKeywords() {
 }
 
 function formatGroupedDigest(newJobs, keywords) {
+  const maxLength = 3800;
   const lines = [
     "<b>Government Job Tracker</b>",
     "",
@@ -52,14 +53,22 @@ function formatGroupedDigest(newJobs, keywords) {
     const keywordJobs = newJobs.filter((job) => job.keywords?.includes(keyword));
     if (keywordJobs.length === 0) continue;
 
-    lines.push("", `<b>${escapeHtml(keyword)}</b>`);
+    lines.push("", `<b>${escapeHtml(keyword)}</b> (${keywordJobs.length})`);
 
-    for (const job of keywordJobs) {
-      lines.push(
-        `- ${escapeHtml(job.title)}${job.organization ? `, ${escapeHtml(job.organization)}` : ""}`
-      );
-      if (job.deadline) lines.push(`  Deadline: ${escapeHtml(job.deadline)}`);
-      if (job.detailUrl) lines.push(`  ${escapeHtml(job.detailUrl)}`);
+    for (const [index, job] of keywordJobs.entries()) {
+      const jobLines = [
+        `${index + 1}. ${escapeHtml(job.title)}`,
+        job.deadline ? `   Deadline: ${escapeHtml(job.deadline)}` : "",
+        job.detailUrl ? `   ${escapeHtml(job.detailUrl)}` : "",
+      ].filter(Boolean);
+      const nextText = [...lines, ...jobLines].join("\n");
+
+      if (nextText.length > maxLength) {
+        lines.push(`...and ${keywordJobs.length - index} more jobs.`);
+        break;
+      }
+
+      lines.push(...jobLines, "");
     }
   }
 
@@ -70,6 +79,7 @@ export async function runDailyJobCheck({ notify = true } = {}) {
   const keywords = await getActiveKeywords();
   const scrapedJobs = await fetchJobs(keywords);
   const newJobs = [];
+  let notificationError = null;
 
   for (const scrapedJob of scrapedJobs) {
     const existing = await Job.findOne({ externalId: scrapedJob.externalId });
@@ -94,7 +104,12 @@ export async function runDailyJobCheck({ notify = true } = {}) {
       }
     }
 
-    await sendTelegramMessage(formatGroupedDigest(newJobs, keywords));
+    try {
+      await sendTelegramMessage(formatGroupedDigest(newJobs, keywords));
+    } catch (error) {
+      notificationError = error.response?.data?.description || error.message;
+      console.error("Telegram notification failed:", notificationError);
+    }
   }
 
   return {
@@ -102,6 +117,7 @@ export async function runDailyJobCheck({ notify = true } = {}) {
     keywords,
     found: scrapedJobs.length,
     new: newJobs.length,
+    notificationError,
     jobs: newJobs,
   };
 }

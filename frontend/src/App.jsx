@@ -117,7 +117,10 @@ export function App() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Check failed");
-      setStatus(`Checked ${data.found} jobs for ${data.keywords.length} keywords. New: ${data.new}.`);
+      setStatus(
+        `Checked ${data.found} jobs for ${data.keywords.length} keywords. New: ${data.new}.` +
+          (data.notificationError ? ` Telegram: ${data.notificationError}` : "")
+      );
       await loadKeywords();
       await loadJobs();
     } catch (error) {

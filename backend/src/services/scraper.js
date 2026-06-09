@@ -43,9 +43,34 @@ async function fetchGovtJobDetails(jobId) {
   return response.data?.details || null;
 }
 
-function findMatchedKeywords(job, keywords) {
-  const title = normalizeText(job?.job_title).toLowerCase();
-  return keywords.filter((keyword) => title.includes(keyword.toLowerCase()));
+function buildSearchText(org, job, details) {
+  const detailOrg = details?.job_utilities_govtorganization || {};
+
+  return normalizeText(
+    [
+      org?.name,
+      org?.name_bn,
+      org?.short_name,
+      org?.website,
+      job?.job_title,
+      job?.job_title_bn,
+      details?.job_title,
+      details?.job_title_bn,
+      details?.job_id,
+      details?.advertisement_no,
+      details?.application_site,
+      details?.job_source,
+      detailOrg.name,
+      detailOrg.name_bn,
+      detailOrg.short_name,
+      detailOrg.website,
+      detailOrg.details,
+    ].join(" ")
+  ).toLowerCase();
+}
+
+function findMatchedKeywords(searchText, keywords) {
+  return keywords.filter((keyword) => searchText.includes(keyword.toLowerCase()));
 }
 
 export async function fetchJobs(keywords = [env.jobKeyword]) {
@@ -65,10 +90,13 @@ export async function fetchJobs(keywords = [env.jobKeyword]) {
 
     for (const org of orgJobs) {
       for (const job of org.govt_jobs || []) {
-        const matchedKeywords = findMatchedKeywords(job, activeKeywords);
+        const details = await fetchGovtJobDetails(job.id);
+        const matchedKeywords = findMatchedKeywords(
+          buildSearchText(org, job, details),
+          activeKeywords
+        );
         if (matchedKeywords.length === 0) continue;
 
-        const details = await fetchGovtJobDetails(job.id);
         const title = normalizeText(details?.job_title || job.job_title);
         const externalId = normalizeText(details?.job_id) || `GOVT-${job.id}`;
         const organization = normalizeText(
