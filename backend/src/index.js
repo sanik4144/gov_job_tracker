@@ -162,14 +162,40 @@ app.patch("/api/jobs/:id/applied", async (req, res, next) => {
 });
 
 app.post("/api/run-daily", async (req, res, next) => {
+  const startedAt = Date.now();
+  const requestSource = {
+    origin: req.header("origin") || "no-origin",
+    userAgent: req.header("user-agent") || "unknown",
+    ip: req.ip,
+  };
+
+  console.log("[run-daily] Request received", {
+    ...requestSource,
+    notify: req.body?.notify !== false,
+    time: new Date().toISOString(),
+  });
+
   try {
     if (env.cronSecret && req.header("x-cron-secret") !== env.cronSecret) {
+      console.warn("[run-daily] Unauthorized request", requestSource);
       return res.status(401).json({ error: "Unauthorized" });
     }
 
     const result = await runDailyJobCheck({ notify: req.body?.notify !== false });
+    console.log("[run-daily] Completed", {
+      durationMs: Date.now() - startedAt,
+      keywords: result.keywords,
+      found: result.found,
+      new: result.new,
+      notificationError: result.notificationError,
+    });
+
     res.json(result);
   } catch (error) {
+    console.error("[run-daily] Failed", {
+      durationMs: Date.now() - startedAt,
+      message: error.message,
+    });
     next(error);
   }
 });
