@@ -2,6 +2,12 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+function normalizeOrigin(origin) {
+  return origin.replace(/\/+$/, "");
+}
+
+const defaultFrontendOrigins = ["http://localhost:5173", "https://gov-job-tracker.vercel.app"];
+
 export const env = {
   port: process.env.PORT || 5000,
   nodeEnv: process.env.NODE_ENV || "development",
@@ -21,7 +27,10 @@ export const env = {
   dailyCron: process.env.DAILY_CRON || "0 9 * * *",
   enableInternalScheduler: process.env.ENABLE_INTERNAL_SCHEDULER !== "false",
   timezone: process.env.TZ || "Asia/Dhaka",
-  frontendOrigin: process.env.FRONTEND_ORIGIN || "http://localhost:5173",
+  frontendOrigins: (process.env.FRONTEND_ORIGIN || defaultFrontendOrigins.join(","))
+    .split(",")
+    .map((origin) => normalizeOrigin(origin.trim()))
+    .filter(Boolean),
 };
 
 export function requireEnv() {
