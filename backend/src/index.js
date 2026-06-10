@@ -183,7 +183,11 @@ app.use((error, _req, res, _next) => {
 });
 
 await connectDb();
-startScheduler();
+if (env.enableInternalScheduler) {
+  startScheduler();
+} else {
+  console.log("Internal scheduler disabled");
+}
 
 app.listen(env.port, () => {
   console.log(`Backend running on port ${env.port}`);

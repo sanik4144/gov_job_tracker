@@ -19,12 +19,13 @@ export const env = {
   jobKeyword: process.env.JOB_KEYWORD || "Assistant Programmer",
   cronSecret: process.env.CRON_SECRET,
   dailyCron: process.env.DAILY_CRON || "0 9 * * *",
+  enableInternalScheduler: process.env.ENABLE_INTERNAL_SCHEDULER !== "false",
   timezone: process.env.TZ || "Asia/Dhaka",
   frontendOrigin: process.env.FRONTEND_ORIGIN || "http://localhost:5173",
 };
 
 export function requireEnv() {
-  const required = ["mongodbUri", "telegramBotToken", "telegramChatId"];
+  const required = ["mongodbUri", "telegramBotToken", "telegramChatId", "cronSecret"];
   const missing = required.filter((key) => !env[key]);
 
   if (missing.length) {
