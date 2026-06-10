@@ -11,10 +11,25 @@ requireEnv();
 
 const app = express();
 let runDailyInProgress = false;
+let dbConnectionError = null;
+const dbReady = connectDb().catch((error) => {
+  dbConnectionError = error;
+  console.error("MongoDB connection failed:", error);
+  throw error;
+});
 
 app.use(
   cors({
-    origin: env.frontendOrigin,
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+
+      const normalizedOrigin = origin.replace(/\/+$/, "");
+      if (env.frontendOrigins.includes(normalizedOrigin)) {
+        return callback(null, origin);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
   })
 );
 app.use(express.json());
@@ -29,6 +44,11 @@ app.get("/health", (_req, res) => {
 
 function normalizeKeyword(value = "") {
   return value.trim().toLowerCase();
+}
+
+async function ensureDbReady() {
+  if (dbConnectionError) throw dbConnectionError;
+  await dbReady;
 }
 
 function getTodayUtcDateOnly() {
@@ -69,6 +89,7 @@ function getDeadlineMeta(deadline) {
 
 app.get("/api/keywords", async (_req, res, next) => {
   try {
+    await ensureDbReady();
     await ensureDefaultKeyword();
     const keywords = await Keyword.find({ active: true }).sort({ value: 1 });
     res.json({ keywords });
@@ -79,6 +100,7 @@ app.get("/api/keywords", async (_req, res, next) => {
 
 app.post("/api/keywords", async (req, res, next) => {
   try {
+    await ensureDbReady();
     const value = String(req.body?.value || "").trim();
     if (!value) return res.status(400).json({ error: "Keyword is required" });
 
@@ -97,6 +119,7 @@ app.post("/api/keywords", async (req, res, next) => {
 
 app.delete("/api/keywords/:id", async (req, res, next) => {
   try {
+    await ensureDbReady();
     const keyword = await Keyword.findByIdAndDelete(req.params.id);
 
     if (!keyword) return res.status(404).json({ error: "Keyword not found" });
@@ -121,6 +144,7 @@ app.delete("/api/keywords/:id", async (req, res, next) => {
 
 app.get("/api/jobs", async (req, res, next) => {
   try {
+    await ensureDbReady();
     const filter = {};
     if (req.query.keyword) {
       filter.keywords = String(req.query.keyword);
@@ -145,6 +169,7 @@ app.get("/api/jobs", async (req, res, next) => {
 
 app.patch("/api/jobs/:id/applied", async (req, res, next) => {
   try {
+    await ensureDbReady();
     const applied = Boolean(req.body?.applied);
     const job = await Job.findByIdAndUpdate(
       req.params.id,
@@ -162,10 +187,14 @@ app.patch("/api/jobs/:id/applied", async (req, res, next) => {
   }
 });
 
-app.post("/api/run-daily", async (req, res, next) => {
+async function handleRunDaily(req, res, next) {
   const startedAt = Date.now();
+  const isExternalCronRequest = !req.header("origin") && Boolean(req.header("x-cron-secret"));
   const runInBackground =
-    req.query.background === "true" || req.body?.background === true || req.body?.async === true;
+    isExternalCronRequest ||
+    req.query.background === "true" ||
+    req.body?.background === true ||
+    req.body?.async === true;
   const requestSource = {
     origin: req.header("origin") || "no-origin",
     userAgent: req.header("user-agent") || "unknown",
@@ -204,6 +233,7 @@ app.post("/api/run-daily", async (req, res, next) => {
 
       setImmediate(async () => {
         try {
+          await ensureDbReady();
           const result = await runDailyJobCheck({ notify: req.body?.notify !== false });
           console.log("[run-daily] Background completed", {
             durationMs: Date.now() - startedAt,
@@ -226,6 +256,7 @@ app.post("/api/run-daily", async (req, res, next) => {
     }
 
     runDailyInProgress = true;
+    await ensureDbReady();
     const result = await runDailyJobCheck({ notify: req.body?.notify !== false });
     runDailyInProgress = false;
     console.log("[run-daily] Completed", {
@@ -245,7 +276,10 @@ app.post("/api/run-daily", async (req, res, next) => {
     });
     next(error);
   }
-});
+}
+
+app.get("/api/run-daily", handleRunDaily);
+app.post("/api/run-daily", handleRunDaily);
 
 app.use((error, _req, res, _next) => {
   console.error(error);
@@ -255,13 +289,18 @@ app.use((error, _req, res, _next) => {
   });
 });
 
-await connectDb();
-if (env.enableInternalScheduler) {
-  startScheduler();
-} else {
-  console.log("Internal scheduler disabled");
-}
-
 app.listen(env.port, () => {
   console.log(`Backend running on port ${env.port}`);
 });
+
+dbReady
+  .then(() => {
+    if (env.enableInternalScheduler) {
+      startScheduler();
+    } else {
+      console.log("Internal scheduler disabled");
+    }
+  })
+  .catch(() => {
+    console.error("Startup continued, but database-dependent routes will fail until restart");
+  });
