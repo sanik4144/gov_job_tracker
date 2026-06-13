@@ -5,6 +5,7 @@ import {
   Check,
   ClipboardCheck,
   ExternalLink,
+  FileText,
   Plus,
   RefreshCcw,
   Search,
@@ -329,6 +330,17 @@ export function App() {
                   {job.detailUrl && (
                     <a href={job.detailUrl} target="_blank" rel="noreferrer" title="Open job details">
                       <ExternalLink size={18} />
+                    </a>
+                  )}
+
+                  {job.advertisementUrl && (
+                    <a
+                      href={job.advertisementUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Open advertisement PDF"
+                    >
+                      <FileText size={18} />
                     </a>
                   )}
                 </div>

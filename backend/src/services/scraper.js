@@ -3,6 +3,7 @@ import { env } from "../config/env.js";
 
 const BASE_URL = "https://alljobs.teletalk.com.bd";
 const API_BASE_URL = `${BASE_URL}/api/v1`;
+const MEDIA_BASE_URL = `${BASE_URL}/media`;
 
 function normalizeText(value) {
   return String(value || "")
@@ -15,6 +16,16 @@ function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return date.toISOString().slice(0, 10);
+}
+
+function buildAbsoluteUrl(value) {
+  const trimmedValue = normalizeText(value);
+  if (!trimmedValue) return "";
+  try {
+    return new URL(trimmedValue, `${MEDIA_BASE_URL}/`).toString();
+  } catch {
+    return "";
+  }
 }
 
 async function fetchGovtOrgJobs(page = 1, limit = 100) {
@@ -103,6 +114,8 @@ export async function fetchJobs(keywords = [env.jobKeyword]) {
           details?.job_utilities_govtorganization?.name || org.name
         );
         const detailUrl = `${BASE_URL}/jobs/government/${org.id}?jobId=${job.id}`;
+        const advertisementFile = normalizeText(details?.advertisement_file);
+        const advertisementUrl = buildAbsoluteUrl(advertisementFile);
 
         byId.set(externalId, {
           externalId,
@@ -110,6 +123,8 @@ export async function fetchJobs(keywords = [env.jobKeyword]) {
           organization,
           deadline: formatDate(details?.deadline_date),
           detailUrl,
+          advertisementFile,
+          advertisementUrl,
           sourceUrl: env.jobSearchUrl,
           keywords: matchedKeywords,
           rawText: normalizeText(

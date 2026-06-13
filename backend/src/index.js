@@ -12,6 +12,7 @@ requireEnv();
 const app = express();
 let runDailyInProgress = false;
 let dbConnectionError = null;
+const MEDIA_BASE_URL = "https://alljobs.teletalk.com.bd/media";
 const dbReady = connectDb().catch((error) => {
   dbConnectionError = error;
   console.error("MongoDB connection failed:", error);
@@ -87,6 +88,18 @@ function getDeadlineMeta(deadline) {
   };
 }
 
+function buildAdvertisementUrl(job) {
+  if (job.advertisementFile) {
+    try {
+      return new URL(job.advertisementFile, `${MEDIA_BASE_URL}/`).toString();
+    } catch {
+      return job.advertisementUrl || "";
+    }
+  }
+
+  return job.advertisementUrl || "";
+}
+
 app.get("/api/keywords", async (_req, res, next) => {
   try {
     await ensureDbReady();
@@ -160,7 +173,7 @@ app.get("/api/jobs", async (req, res, next) => {
     const visibleJobs = jobs
       .map((job) => {
         const deadlineMeta = getDeadlineMeta(job.deadline);
-        return { ...job, ...deadlineMeta };
+        return { ...job, ...deadlineMeta, advertisementUrl: buildAdvertisementUrl(job) };
       })
       .filter((job) => includeExpired || !job.isExpired)
       .sort((a, b) => a.deadlineTime - b.deadlineTime || a.title.localeCompare(b.title))

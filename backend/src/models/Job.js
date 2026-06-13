@@ -15,6 +15,8 @@ const jobSchema = new mongoose.Schema(
     organization: String,
     deadline: String,
     detailUrl: String,
+    advertisementFile: String,
+    advertisementUrl: String,
     sourceUrl: {
       type: String,
       required: true,
