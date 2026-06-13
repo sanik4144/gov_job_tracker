@@ -19,9 +19,70 @@ a {
 }
 
 .app-shell {
-  width: min(1120px, calc(100% - 32px));
+  width: min(1240px, calc(100% - 32px));
   margin: 0 auto;
   padding: 32px 0;
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.sidebar {
+  position: sticky;
+  top: 24px;
+  display: grid;
+  gap: 24px;
+  border: 1px solid #d9e1da;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 18px;
+}
+
+.sidebar h1 {
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.sidebar p {
+  margin-top: 8px;
+  color: #5c6d61;
+  font-size: 14px;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 8px;
+}
+
+.sidebar-nav button {
+  width: 100%;
+  justify-content: flex-start;
+  border-color: transparent;
+  background: transparent;
+  color: #334139;
+}
+
+.sidebar-nav button.active {
+  border-color: #276d4d;
+  background: #e8f1eb;
+  color: #244633;
+}
+
+.sidebar-nav span {
+  margin-left: auto;
+  min-width: 26px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #276d4d;
+  padding: 2px 8px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.content-panel {
+  min-width: 0;
 }
 
 .toolbar {
@@ -42,6 +103,11 @@ p {
 h1 {
   font-size: clamp(28px, 4vw, 44px);
   line-height: 1;
+}
+
+.toolbar h2 {
+  font-size: 32px;
+  line-height: 1.1;
 }
 
 .toolbar p {
@@ -319,6 +385,25 @@ button:disabled {
 }
 
 @media (max-width: 720px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding: 18px 0;
+  }
+
+  .sidebar {
+    position: static;
+    gap: 16px;
+  }
+
+  .sidebar-nav {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sidebar-nav button {
+    justify-content: center;
+  }
+
   .toolbar {
     align-items: flex-start;
     flex-direction: column;
@@ -344,6 +429,10 @@ button:disabled {
 
   button {
     justify-content: center;
+  }
+
+  .sidebar-nav span {
+    margin-left: 0;
   }
 
   .job-actions {
