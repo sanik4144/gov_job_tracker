@@ -149,19 +149,25 @@ app.get("/api/jobs", async (req, res, next) => {
     if (req.query.keyword) {
       filter.keywords = String(req.query.keyword);
     }
+    if (req.query.applied === "true") {
+      filter.applied = true;
+    }
+
+    const includeExpired = req.query.includeExpired === "true";
+    const resultLimit = req.query.applied === "true" ? undefined : 100;
 
     const jobs = await Job.find(filter).lean();
-    const activeJobs = jobs
+    const visibleJobs = jobs
       .map((job) => {
         const deadlineMeta = getDeadlineMeta(job.deadline);
         return { ...job, ...deadlineMeta };
       })
-      .filter((job) => !job.isExpired)
+      .filter((job) => includeExpired || !job.isExpired)
       .sort((a, b) => a.deadlineTime - b.deadlineTime || a.title.localeCompare(b.title))
-      .slice(0, 100)
-      .map(({ deadlineTime, isExpired, ...job }) => job);
+      .slice(0, resultLimit)
+      .map(({ deadlineTime, ...job }) => job);
 
-    res.json({ jobs: activeJobs });
+    res.json({ jobs: visibleJobs });
   } catch (error) {
     next(error);
   }

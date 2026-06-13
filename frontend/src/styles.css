@@ -295,6 +295,19 @@ button:disabled {
   gap: 8px;
 }
 
+.job-card .deadline.expired {
+  color: #8a4b2a;
+}
+
+.expired-label {
+  border-radius: 999px;
+  background: #f7e7dc;
+  color: #8a4b2a;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .job-card .deadline-dot {
   display: inline-block;
   flex: 0 0 auto;

@@ -16,6 +16,7 @@ const CRON_SECRET = import.meta.env.VITE_CRON_SECRET || "";
 
 export function App() {
   const [jobs, setJobs] = useState([]);
+  const [appliedJobs, setAppliedJobs] = useState([]);
   const [keywords, setKeywords] = useState([]);
   const [selectedKeyword, setSelectedKeyword] = useState("");
   const [newKeyword, setNewKeyword] = useState("");
@@ -24,7 +25,6 @@ export function App() {
   const [status, setStatus] = useState("");
   const [activeView, setActiveView] = useState("jobs");
 
-  const appliedJobs = jobs.filter((job) => job.applied);
   const visibleJobs = activeView === "applied" ? appliedJobs : jobs;
   const emptyMessage = activeView === "applied" ? "No applied jobs yet" : "No saved jobs yet";
 
@@ -50,6 +50,17 @@ export function App() {
     }
   }
 
+  async function loadAppliedJobs() {
+    const response = await fetch(`${API_BASE_URL}/api/jobs?applied=true&includeExpired=true`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not load applied jobs");
+    setAppliedJobs(data.jobs || []);
+  }
+
+  async function refreshJobs(keyword = selectedKeyword) {
+    await Promise.all([loadJobs(keyword), loadAppliedJobs()]);
+  }
+
   async function addKeyword(event) {
     event.preventDefault();
     const value = newKeyword.trim();
@@ -66,7 +77,7 @@ export function App() {
       setNewKeyword("");
       setSelectedKeyword(data.keyword.value);
       await loadKeywords();
-      await loadJobs(data.keyword.value);
+      await refreshJobs(data.keyword.value);
       setStatus(`Saved keyword: ${data.keyword.value}`);
     } catch (error) {
       setStatus(error.message);
@@ -84,7 +95,7 @@ export function App() {
       const nextSelected = selectedKeyword === value ? "" : selectedKeyword;
       setSelectedKeyword(nextSelected);
       await loadKeywords();
-      await loadJobs(nextSelected);
+      await refreshJobs(nextSelected);
       setStatus(`Removed ${value}. Deleted ${data.deletedJobs || 0} saved jobs.`);
     } catch (error) {
       setStatus(error.message);
@@ -113,6 +124,7 @@ export function App() {
             : currentJob
         )
       );
+      await loadAppliedJobs();
     } catch (error) {
       setStatus(error.message);
     }
@@ -137,7 +149,7 @@ export function App() {
           (data.notificationError ? ` Telegram: ${data.notificationError}` : "")
       );
       await loadKeywords();
-      await loadJobs();
+      await refreshJobs();
     } catch (error) {
       setStatus(error.message);
     } finally {
@@ -149,7 +161,7 @@ export function App() {
     async function boot() {
       try {
         await loadKeywords();
-        await loadJobs("");
+        await refreshJobs("");
       } catch (error) {
         setStatus(error.message);
         setLoading(false);
@@ -200,7 +212,7 @@ export function App() {
           </div>
 
           <div className="actions">
-            <button type="button" onClick={() => loadJobs()} disabled={loading} title="Refresh jobs">
+            <button type="button" onClick={() => refreshJobs()} disabled={loading} title="Refresh jobs">
               <RefreshCcw size={18} />
               Refresh
             </button>
@@ -289,8 +301,9 @@ export function App() {
                   <h2>{job.title}</h2>
                   <p>{job.organization || "AllJobs by Teletalk"}</p>
                   {job.deadline && (
-                    <span className="deadline">
+                    <span className={job.isExpired ? "deadline expired" : "deadline"}>
                       Deadline: {job.deadline}
+                      {job.isExpired && <span className="expired-label">Expired</span>}
                       {job.isDueSoon && <span className="deadline-dot" aria-label="Deadline in 2 days" />}
                     </span>
                   )}
