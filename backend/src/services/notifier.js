@@ -90,6 +90,7 @@ export async function runDailyJobCheck({ notify = true } = {}) {
       existing.organization = scrapedJob.organization;
       existing.deadline = scrapedJob.deadline;
       existing.detailUrl = scrapedJob.detailUrl;
+      existing.applicationSite = scrapedJob.applicationSite;
       existing.advertisementFile = scrapedJob.advertisementFile;
       existing.advertisementUrl = scrapedJob.advertisementUrl;
       existing.sourceUrl = scrapedJob.sourceUrl;

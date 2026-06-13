@@ -28,6 +28,20 @@ function buildAbsoluteUrl(value) {
   }
 }
 
+function buildApplicationUrl(value) {
+  const trimmedValue = normalizeText(value);
+  if (!trimmedValue) return "";
+  try {
+    return new URL(trimmedValue).toString();
+  } catch {
+    try {
+      return new URL(`https://${trimmedValue}`).toString();
+    } catch {
+      return "";
+    }
+  }
+}
+
 async function fetchGovtOrgJobs(page = 1, limit = 100) {
   const response = await axios.get(`${API_BASE_URL}/govt-jobs/org-list`, {
     timeout: 20000,
@@ -114,6 +128,7 @@ export async function fetchJobs(keywords = [env.jobKeyword]) {
           details?.job_utilities_govtorganization?.name || org.name
         );
         const detailUrl = `${BASE_URL}/jobs/government/${org.id}?jobId=${job.id}`;
+        const applicationSite = buildApplicationUrl(details?.application_site);
         const advertisementFile = normalizeText(details?.advertisement_file);
         const advertisementUrl = buildAbsoluteUrl(advertisementFile);
 
@@ -123,6 +138,7 @@ export async function fetchJobs(keywords = [env.jobKeyword]) {
           organization,
           deadline: formatDate(details?.deadline_date),
           detailUrl,
+          applicationSite,
           advertisementFile,
           advertisementUrl,
           sourceUrl: env.jobSearchUrl,

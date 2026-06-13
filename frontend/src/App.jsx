@@ -25,6 +25,7 @@ export function App() {
   const [running, setRunning] = useState(false);
   const [status, setStatus] = useState("");
   const [activeView, setActiveView] = useState("jobs");
+  const [pdfJob, setPdfJob] = useState(null);
 
   const visibleJobs = activeView === "applied" ? appliedJobs : jobs;
   const emptyMessage = activeView === "applied" ? "No applied jobs yet" : "No saved jobs yet";
@@ -318,6 +319,23 @@ export function App() {
                 </div>
 
                 <div className="job-actions">
+                  {job.advertisementUrl && (
+                    <button
+                      type="button"
+                      className="pdf-toggle"
+                      onClick={() => setPdfJob(job)}
+                      title="Open advertisement PDF"
+                    >
+                      <FileText size={18} />
+                    </button>
+                  )}
+
+                  {job.detailUrl && (
+                    <a href={job.detailUrl} target="_blank" rel="noreferrer" title="Open job details">
+                      <ExternalLink size={18} />
+                    </a>
+                  )}
+
                   <button
                     type="button"
                     className={job.applied ? "applied-toggle active" : "applied-toggle"}
@@ -326,29 +344,49 @@ export function App() {
                   >
                     <Check size={18} />
                   </button>
-
-                  {job.detailUrl && (
-                    <a href={job.detailUrl} target="_blank" rel="noreferrer" title="Open job details">
-                      <ExternalLink size={18} />
-                    </a>
-                  )}
-
-                  {job.advertisementUrl && (
-                    <a
-                      href={job.advertisementUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="Open advertisement PDF"
-                    >
-                      <FileText size={18} />
-                    </a>
-                  )}
                 </div>
               </article>
             ))
           )}
         </section>
       </div>
+
+      {pdfJob && (
+        <div className="pdf-modal-backdrop" role="presentation" onClick={() => setPdfJob(null)}>
+          <section
+            className="pdf-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pdf-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="pdf-modal-header">
+              <div>
+                <h2 id="pdf-modal-title">{pdfJob.title}</h2>
+                <p>{pdfJob.organization || "AllJobs by Teletalk"}</p>
+              </div>
+
+              <div className="pdf-modal-actions">
+                {pdfJob.applicationSite && (
+                  <a href={pdfJob.applicationSite} target="_blank" rel="noreferrer">
+                    <ExternalLink size={18} />
+                    Apply
+                  </a>
+                )}
+                <button type="button" onClick={() => setPdfJob(null)} title="Close PDF">
+                  <X size={18} />
+                </button>
+              </div>
+            </header>
+
+            <iframe
+              className="pdf-frame"
+              src={pdfJob.advertisementUrl}
+              title={`${pdfJob.title} advertisement PDF`}
+            />
+          </section>
+        </div>
+      )}
     </main>
   );
 }
