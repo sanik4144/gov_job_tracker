@@ -86,6 +86,15 @@ export async function runDailyJobCheck({ notify = true } = {}) {
 
     if (existing) {
       existing.lastSeenAt = new Date();
+      existing.title = scrapedJob.title;
+      existing.organization = scrapedJob.organization;
+      existing.deadline = scrapedJob.deadline;
+      existing.detailUrl = scrapedJob.detailUrl;
+      existing.applicationSite = scrapedJob.applicationSite;
+      existing.advertisementFile = scrapedJob.advertisementFile;
+      existing.advertisementUrl = scrapedJob.advertisementUrl;
+      existing.sourceUrl = scrapedJob.sourceUrl;
+      existing.rawText = scrapedJob.rawText;
       existing.keywords = [...new Set([...(existing.keywords || []), ...scrapedJob.keywords])];
       await existing.save();
       continue;
