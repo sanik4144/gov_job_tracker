@@ -1,11 +1,12 @@
-import express from "express";
 import cors from "cors";
+import express from "express";
 import { env, requireEnv } from "./config/env.js";
 import { connectDb } from "./db.js";
 import { Job } from "./models/Job.js";
 import { Keyword } from "./models/Keyword.js";
-import { ensureDefaultKeyword, runDailyJobCheck } from "./services/notifier.js";
+import authRouter from "./routes/authRouter.js";
 import { startScheduler } from "./scheduler.js";
+import { ensureDefaultKeyword, runDailyJobCheck } from "./services/notifier.js";
 
 requireEnv();
 
@@ -34,6 +35,7 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(authRouter);
 
 app.get("/health", (_req, res) => {
   res.json({
