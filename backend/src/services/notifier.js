@@ -1,6 +1,5 @@
 import { Job } from "../models/Job.js";
 import { Keyword } from "../models/Keyword.js";
-import { env } from "../config/env.js";
 import { fetchJobs } from "./scraper.js";
 import { sendTelegramMessage } from "./telegram.js";
 
@@ -11,29 +10,9 @@ function escapeHtml(value = "") {
     .replaceAll(">", "&gt;");
 }
 
-function normalizeKeyword(value) {
-  return value.trim().toLowerCase();
-}
-
-export async function ensureDefaultKeyword() {
-  const value = env.jobKeyword;
-  await Keyword.updateOne(
-    { normalizedValue: normalizeKeyword(value) },
-    {
-      $setOnInsert: {
-        value,
-        normalizedValue: normalizeKeyword(value),
-        active: true,
-      },
-    },
-    { upsert: true }
-  );
-}
-
 export async function getActiveKeywords() {
-  await ensureDefaultKeyword();
   const keywords = await Keyword.find({ active: true }).sort({ value: 1 }).lean();
-  return keywords.map((keyword) => keyword.value);
+  return [...new Set(keywords.map((keyword) => keyword.value))];
 }
 
 function formatGroupedDigest(newJobs, keywords) {
@@ -77,6 +56,18 @@ function formatGroupedDigest(newJobs, keywords) {
 
 export async function runDailyJobCheck({ notify = true } = {}) {
   const keywords = await getActiveKeywords();
+
+  if (keywords.length === 0) {
+    return {
+      checkedAt: new Date().toISOString(),
+      keywords,
+      found: 0,
+      new: 0,
+      notificationError: null,
+      jobs: [],
+    };
+  }
+
   const scrapedJobs = await fetchJobs(keywords);
   const newJobs = [];
   let notificationError = null;

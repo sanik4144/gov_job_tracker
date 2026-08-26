@@ -5,13 +5,17 @@ const keywordSchema = new mongoose.Schema(
     value: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
     normalizedValue: {
       type: String,
       required: true,
-      unique: true,
+      index: true,
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
       index: true,
     },
     active: {
@@ -21,5 +25,7 @@ const keywordSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+keywordSchema.index({ userId: 1, normalizedValue: 1 }, { unique: true });
 
 export const Keyword = mongoose.model("Keyword", keywordSchema);

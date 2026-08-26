@@ -2,11 +2,12 @@ import cors from "cors";
 import express from "express";
 import { env, requireEnv } from "./config/env.js";
 import { connectDb } from "./db.js";
+import { authenticate } from "./middleware/auth.js";
 import { Job } from "./models/Job.js";
 import { Keyword } from "./models/Keyword.js";
 import authRouter from "./routes/authRouter.js";
 import { startScheduler } from "./scheduler.js";
-import { ensureDefaultKeyword, runDailyJobCheck } from "./services/notifier.js";
+import { runDailyJobCheck } from "./services/notifier.js";
 
 requireEnv();
 
@@ -35,6 +36,7 @@ app.use(
   })
 );
 app.use(express.json());
+app.use("/api/auth", authRouter);
 app.use(authRouter);
 
 app.get("/health", (_req, res) => {
@@ -102,18 +104,17 @@ function buildAdvertisementUrl(job) {
   return job.advertisementUrl || "";
 }
 
-app.get("/api/keywords", async (_req, res, next) => {
+app.get("/api/keywords", authenticate, async (req, res, next) => {
   try {
     await ensureDbReady();
-    await ensureDefaultKeyword();
-    const keywords = await Keyword.find({ active: true }).sort({ value: 1 });
+    const keywords = await Keyword.find({ userId: req.user._id, active: true }).sort({ value: 1 });
     res.json({ keywords });
   } catch (error) {
     next(error);
   }
 });
 
-app.post("/api/keywords", async (req, res, next) => {
+app.post("/api/keywords", authenticate, async (req, res, next) => {
   try {
     await ensureDbReady();
     const value = String(req.body?.value || "").trim();
@@ -121,8 +122,8 @@ app.post("/api/keywords", async (req, res, next) => {
 
     const normalizedValue = normalizeKeyword(value);
     const keyword = await Keyword.findOneAndUpdate(
-      { normalizedValue },
-      { value, normalizedValue, active: true },
+      { userId: req.user._id, normalizedValue },
+      { value, normalizedValue, userId: req.user._id, active: true },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
@@ -132,51 +133,53 @@ app.post("/api/keywords", async (req, res, next) => {
   }
 });
 
-app.delete("/api/keywords/:id", async (req, res, next) => {
+app.delete("/api/keywords/:id", authenticate, async (req, res, next) => {
   try {
     await ensureDbReady();
-    const keyword = await Keyword.findByIdAndDelete(req.params.id);
+    const keyword = await Keyword.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
 
     if (!keyword) return res.status(404).json({ error: "Keyword not found" });
 
-    const pulled = await Job.updateMany(
-      { keywords: keyword.value },
-      { $pull: { keywords: keyword.value } }
-    );
-    const deletedJobs = await Job.deleteMany({
-      $or: [{ keywords: { $exists: false } }, { keywords: { $size: 0 } }],
-    });
-
     res.json({
       keyword,
-      affectedJobs: pulled.modifiedCount,
-      deletedJobs: deletedJobs.deletedCount,
+      affectedJobs: 0,
+      deletedJobs: 0,
     });
   } catch (error) {
     next(error);
   }
 });
 
-app.get("/api/jobs", async (req, res, next) => {
+app.get("/api/jobs", authenticate, async (req, res, next) => {
   try {
     await ensureDbReady();
     const filter = {};
     if (req.query.keyword) {
       filter.keywords = String(req.query.keyword);
     }
-    if (req.query.applied === "true") {
-      filter.applied = true;
-    }
-
     const includeExpired = req.query.includeExpired === "true";
     const resultLimit = req.query.applied === "true" ? undefined : 100;
+    const appliedById = new Map(
+      (req.user.appliedJobs || []).map((appliedJob) => [
+        appliedJob.job.toString(),
+        appliedJob.appliedAt,
+      ])
+    );
 
     const jobs = await Job.find(filter).lean();
     const visibleJobs = jobs
       .map((job) => {
         const deadlineMeta = getDeadlineMeta(job.deadline);
-        return { ...job, ...deadlineMeta, advertisementUrl: buildAdvertisementUrl(job) };
+        const appliedAt = appliedById.get(job._id.toString()) || null;
+        return {
+          ...job,
+          ...deadlineMeta,
+          advertisementUrl: buildAdvertisementUrl(job),
+          applied: Boolean(appliedAt),
+          appliedAt,
+        };
       })
+      .filter((job) => req.query.applied !== "true" || job.applied)
       .filter((job) => includeExpired || !job.isExpired)
       .sort((a, b) => a.deadlineTime - b.deadlineTime || a.title.localeCompare(b.title))
       .slice(0, resultLimit)
@@ -188,21 +191,42 @@ app.get("/api/jobs", async (req, res, next) => {
   }
 });
 
-app.patch("/api/jobs/:id/applied", async (req, res, next) => {
+app.patch("/api/jobs/:id/applied", authenticate, async (req, res, next) => {
   try {
     await ensureDbReady();
     const applied = Boolean(req.body?.applied);
-    const job = await Job.findByIdAndUpdate(
-      req.params.id,
-      {
-        applied,
-        appliedAt: applied ? new Date() : null,
-      },
-      { new: true }
-    );
+    const job = await Job.findById(req.params.id).lean();
 
     if (!job) return res.status(404).json({ error: "Job not found" });
-    res.json({ job });
+
+    const existingAppliedJob = req.user.appliedJobs.find(
+      (appliedJob) => appliedJob.job.toString() === req.params.id
+    );
+
+    if (applied && !existingAppliedJob) {
+      req.user.appliedJobs.push({ job: req.params.id, appliedAt: new Date() });
+    }
+
+    if (!applied) {
+      req.user.appliedJobs = req.user.appliedJobs.filter(
+        (appliedJob) => appliedJob.job.toString() !== req.params.id
+      );
+    }
+
+    await req.user.save();
+
+    const savedAppliedJob = req.user.appliedJobs.find(
+      (appliedJob) => appliedJob.job.toString() === req.params.id
+    );
+
+    res.json({
+      job: {
+        ...job,
+        advertisementUrl: buildAdvertisementUrl(job),
+        applied: Boolean(savedAppliedJob),
+        appliedAt: savedAppliedJob?.appliedAt || null,
+      },
+    });
   } catch (error) {
     next(error);
   }

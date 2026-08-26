@@ -13,9 +13,100 @@ body {
   margin: 0;
 }
 
+input {
+  min-width: 0;
+}
+
 button,
 a {
   font: inherit;
+}
+
+.auth-shell {
+  min-height: 100vh;
+  width: min(980px, calc(100% - 32px));
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 32px 0;
+}
+
+.auth-panel {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 420px);
+  gap: 36px;
+  align-items: center;
+}
+
+.auth-copy h1 {
+  font-size: clamp(36px, 7vw, 68px);
+  line-height: 0.95;
+}
+
+.auth-copy p {
+  max-width: 480px;
+  margin-top: 18px;
+  color: #5c6d61;
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d9e1da;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 18px;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.auth-tabs button {
+  justify-content: center;
+  border-color: #d9e1da;
+}
+
+.auth-tabs button.active {
+  border-color: #276d4d;
+  background: #e8f1eb;
+  color: #244633;
+}
+
+.auth-form label {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #d9e1da;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 0 12px;
+  color: #5c6d61;
+}
+
+.auth-form input {
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  outline: 0;
+  color: #17211b;
+  font: inherit;
+}
+
+.auth-submit {
+  width: 100%;
+  justify-content: center;
+  border-color: #276d4d;
+  background: #276d4d;
+  color: #ffffff;
 }
 
 .app-shell {
@@ -79,6 +170,37 @@ a {
   text-align: center;
   font-size: 13px;
   font-weight: 700;
+}
+
+.account-panel {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid #d9e1da;
+  padding-top: 16px;
+}
+
+.account-panel strong,
+.account-panel span {
+  display: block;
+}
+
+.account-panel strong {
+  overflow: hidden;
+  color: #17211b;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-panel span {
+  margin-top: 4px;
+  color: #5c6d61;
+  font-size: 13px;
+  text-transform: capitalize;
+}
+
+.account-panel button {
+  width: 100%;
+  justify-content: center;
 }
 
 .content-panel {
@@ -483,6 +605,19 @@ button:disabled {
 }
 
 @media (max-width: 720px) {
+  .auth-shell {
+    align-items: start;
+  }
+
+  .auth-panel {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+
+  .auth-copy p {
+    font-size: 16px;
+  }
+
   .app-shell {
     grid-template-columns: 1fr;
     gap: 18px;

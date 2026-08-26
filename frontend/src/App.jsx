@@ -6,16 +6,28 @@ import {
   ClipboardCheck,
   ExternalLink,
   FileText,
+  Lock,
+  LogIn,
+  LogOut,
+  Mail,
   Plus,
   RefreshCcw,
   Search,
+  User,
+  UserPlus,
   X,
 } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 const CRON_SECRET = import.meta.env.VITE_CRON_SECRET || "";
+const AUTH_STORAGE_KEY = "gov-job-tracker-auth";
 
 export function App() {
+  const [token, setToken] = useState(() => localStorage.getItem(AUTH_STORAGE_KEY) || "");
+  const [user, setUser] = useState(null);
+  const [authMode, setAuthMode] = useState("login");
+  const [authForm, setAuthForm] = useState({ name: "", email: "", password: "" });
+  const [authLoading, setAuthLoading] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [appliedJobs, setAppliedJobs] = useState([]);
   const [keywords, setKeywords] = useState([]);
@@ -30,10 +42,93 @@ export function App() {
   const visibleJobs = activeView === "applied" ? appliedJobs : jobs;
   const emptyMessage = activeView === "applied" ? "No applied jobs yet" : "No saved jobs yet";
 
+  async function apiFetch(path, options = {}) {
+    const headers = {
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    };
+
+    const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+    const data = await response.json().catch(() => ({}));
+
+    if (response.status === 401) {
+      clearAuth();
+      throw new Error(data.message || data.error || "Please log in again");
+    }
+
+    if (!response.ok) {
+      throw new Error(data.message || data.error || "Request failed");
+    }
+
+    return data;
+  }
+
+  function saveAuth(authData) {
+    localStorage.setItem(AUTH_STORAGE_KEY, authData.token);
+    setToken(authData.token);
+    setUser(authData.user);
+    setAuthForm({ name: "", email: "", password: "" });
+    setStatus("");
+  }
+
+  function clearAuth() {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    setToken("");
+    setUser(null);
+    setJobs([]);
+    setAppliedJobs([]);
+    setKeywords([]);
+    setSelectedKeyword("");
+    setActiveView("jobs");
+    setLoading(false);
+  }
+
+  async function submitAuth(event) {
+    event.preventDefault();
+    setAuthLoading(true);
+    setStatus("");
+
+    try {
+      const path = authMode === "register" ? "/api/auth/register" : "/api/auth/login";
+      const payload =
+        authMode === "register"
+          ? authForm
+          : { email: authForm.email, password: authForm.password };
+      const data = await fetch(`${API_BASE_URL}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).then(async (response) => {
+        const responseData = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(responseData.message || responseData.error || "Authentication failed");
+        }
+        return responseData;
+      });
+
+      saveAuth(data);
+    } catch (error) {
+      setStatus(error.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  async function logout() {
+    try {
+      if (token) {
+        await apiFetch("/api/auth/logout", { method: "POST" });
+      }
+    } catch (error) {
+      setStatus(error.message);
+    } finally {
+      clearAuth();
+    }
+  }
+
   async function loadKeywords() {
-    const response = await fetch(`${API_BASE_URL}/api/keywords`);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Could not load keywords");
+    const data = await apiFetch("/api/keywords");
     setKeywords(data.keywords || []);
   }
 
@@ -41,9 +136,7 @@ export function App() {
     setLoading(true);
     try {
       const query = keyword ? `?keyword=${encodeURIComponent(keyword)}` : "";
-      const response = await fetch(`${API_BASE_URL}/api/jobs${query}`);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not load jobs");
+      const data = await apiFetch(`/api/jobs${query}`);
       setJobs(data.jobs || []);
     } catch (error) {
       setStatus(error.message);
@@ -53,9 +146,7 @@ export function App() {
   }
 
   async function loadAppliedJobs() {
-    const response = await fetch(`${API_BASE_URL}/api/jobs?applied=true&includeExpired=true`);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Could not load applied jobs");
+    const data = await apiFetch("/api/jobs?applied=true&includeExpired=true");
     setAppliedJobs(data.jobs || []);
   }
 
@@ -69,13 +160,10 @@ export function App() {
     if (!value) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/keywords`, {
+      const data = await apiFetch("/api/keywords", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not save keyword");
       setNewKeyword("");
       setSelectedKeyword(data.keyword.value);
       await loadKeywords();
@@ -88,11 +176,9 @@ export function App() {
 
   async function removeKeyword(id, value) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/keywords/${id}`, {
+      const data = await apiFetch(`/api/keywords/${id}`, {
         method: "DELETE",
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not remove keyword");
 
       const nextSelected = selectedKeyword === value ? "" : selectedKeyword;
       setSelectedKeyword(nextSelected);
@@ -111,13 +197,10 @@ export function App() {
 
   async function toggleApplied(job) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/jobs/${job._id}/applied`, {
+      const data = await apiFetch(`/api/jobs/${job._id}/applied`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ applied: !job.applied }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not update applied status");
 
       setJobs((currentJobs) =>
         currentJobs.map((currentJob) =>
@@ -160,8 +243,15 @@ export function App() {
   }
 
   useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
     async function boot() {
       try {
+        const authData = await apiFetch("/api/auth/me");
+        setUser(authData.user);
         await loadKeywords();
         await refreshJobs("");
       } catch (error) {
@@ -171,7 +261,86 @@ export function App() {
     }
 
     boot();
-  }, []);
+  }, [token]);
+
+  if (!token) {
+    return (
+      <main className="auth-shell">
+        <section className="auth-panel">
+          <div className="auth-copy">
+            <h1>Gov Job Tracker</h1>
+            <p>Sign in to manage your own keywords, saved jobs, and application progress.</p>
+          </div>
+
+          <form className="auth-form" onSubmit={submitAuth}>
+            <div className="auth-tabs" role="tablist" aria-label="Authentication mode">
+              <button
+                type="button"
+                className={authMode === "login" ? "active" : ""}
+                onClick={() => setAuthMode("login")}
+              >
+                <LogIn size={18} />
+                Login
+              </button>
+              <button
+                type="button"
+                className={authMode === "register" ? "active" : ""}
+                onClick={() => setAuthMode("register")}
+              >
+                <UserPlus size={18} />
+                Register
+              </button>
+            </div>
+
+            {authMode === "register" && (
+              <label>
+                <User size={18} />
+                <input
+                  value={authForm.name}
+                  onChange={(event) => setAuthForm({ ...authForm, name: event.target.value })}
+                  placeholder="Full name"
+                  autoComplete="name"
+                  required
+                />
+              </label>
+            )}
+
+            <label>
+              <Mail size={18} />
+              <input
+                value={authForm.email}
+                onChange={(event) => setAuthForm({ ...authForm, email: event.target.value })}
+                placeholder="Email address"
+                type="email"
+                autoComplete="email"
+                required
+              />
+            </label>
+
+            <label>
+              <Lock size={18} />
+              <input
+                value={authForm.password}
+                onChange={(event) => setAuthForm({ ...authForm, password: event.target.value })}
+                placeholder="Password"
+                type="password"
+                autoComplete={authMode === "register" ? "new-password" : "current-password"}
+                minLength={6}
+                required
+              />
+            </label>
+
+            {status && <p className="status">{status}</p>}
+
+            <button className="auth-submit" type="submit" disabled={authLoading}>
+              {authMode === "register" ? <UserPlus size={18} /> : <LogIn size={18} />}
+              {authLoading ? "Please wait" : authMode === "register" ? "Create Account" : "Login"}
+            </button>
+          </form>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="app-shell">
@@ -200,6 +369,17 @@ export function App() {
             <span>{appliedJobs.length}</span>
           </button>
         </nav>
+
+        <div className="account-panel">
+          <div>
+            <strong>{user?.name || "Account"}</strong>
+            <span>{user?.plan || "free"} plan</span>
+          </div>
+          <button type="button" onClick={logout} title="Logout">
+            <LogOut size={18} />
+            Logout
+          </button>
+        </div>
       </aside>
 
       <div className="content-panel">

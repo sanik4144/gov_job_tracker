@@ -98,7 +98,7 @@ function findMatchedKeywords(searchText, keywords) {
   return keywords.filter((keyword) => searchText.includes(keyword.toLowerCase()));
 }
 
-export async function fetchJobs(keywords = [env.jobKeyword]) {
+export async function fetchJobs(keywords = []) {
   const activeKeywords = [...new Set(keywords.map(normalizeText).filter(Boolean))];
   if (activeKeywords.length === 0) return [];
 

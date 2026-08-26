@@ -44,10 +44,44 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    plan: {
+      type: String,
+      enum: ["free", "pro", "team"],
+      default: "free",
+    },
+    subscriptionStatus: {
+      type: String,
+      enum: ["free", "trialing", "active", "past_due", "canceled"],
+      default: "free",
+    },
+    subscriptionEndsAt: {
+      type: Date,
+      default: null,
+    },
+    appliedJobs: [
+      {
+        job: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Job",
+          required: true,
+        },
+        appliedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   {
     timestamps: true,
   }
 );
+
+userSchema.methods.toSafeJSON = function toSafeJSON() {
+  const user = this.toObject();
+  delete user.password;
+  delete user.appliedJobs;
+  return user;
+};
 
 export default mongoose.model("User", userSchema);
