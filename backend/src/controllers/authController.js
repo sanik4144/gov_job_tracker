@@ -105,6 +105,32 @@ export const updateProfile = async (req, res) => {
     return res.status(400).json({ message: "Name is required" });
   }
 
+  if (Object.prototype.hasOwnProperty.call(req.body, "notificationsEnabled")) {
+    req.user.notificationsEnabled = Boolean(req.body.notificationsEnabled);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, "notificationFrequency")) {
+    if (!["daily", "weekly"].includes(req.body.notificationFrequency)) {
+      return res.status(400).json({ message: "Notification frequency must be daily or weekly" });
+    }
+    req.user.notificationFrequency = req.body.notificationFrequency;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, "notificationTime")) {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(req.body.notificationTime)) {
+      return res.status(400).json({ message: "Notification time must be in HH:mm format" });
+    }
+    req.user.notificationTime = req.body.notificationTime;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(req.body, "notificationDayOfWeek")) {
+    const dayOfWeek = Number(req.body.notificationDayOfWeek);
+    if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+      return res.status(400).json({ message: "Notification day must be between Sunday and Saturday" });
+    }
+    req.user.notificationDayOfWeek = dayOfWeek;
+  }
+
   try {
     await req.user.save();
     return res.json({

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Bell,
   BriefcaseBusiness,
+  CalendarDays,
   Check,
   ClipboardCheck,
   ExternalLink,
@@ -16,6 +17,7 @@ import {
   RefreshCcw,
   Save,
   Send,
+  Settings,
   Search,
   User,
   UserPlus,
@@ -24,6 +26,15 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 const AUTH_STORAGE_KEY = "gov-job-tracker-auth";
+const DAYS_OF_WEEK = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 
 export function App() {
   const [token, setToken] = useState(() => localStorage.getItem(AUTH_STORAGE_KEY) || "");
@@ -36,6 +47,10 @@ export function App() {
     avatar: "",
     telegramId: "",
     whatsappId: "",
+    notificationsEnabled: true,
+    notificationFrequency: "daily",
+    notificationTime: "19:00",
+    notificationDayOfWeek: 0,
   });
   const [authLoading, setAuthLoading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -61,6 +76,10 @@ export function App() {
       avatar: nextUser?.avatar || "",
       telegramId: nextUser?.telegramId || "",
       whatsappId: nextUser?.whatsappId || "",
+      notificationsEnabled: nextUser?.notificationsEnabled ?? true,
+      notificationFrequency: nextUser?.notificationFrequency || "daily",
+      notificationTime: nextUser?.notificationTime || "19:00",
+      notificationDayOfWeek: nextUser?.notificationDayOfWeek ?? 0,
     });
   }
 
@@ -459,83 +478,187 @@ export function App() {
             {status && <p className="status">{status}</p>}
 
             <form className="profile-form" onSubmit={saveProfile}>
-              <label>
-                <span>Name</span>
-                <div>
+              <section className="profile-section">
+                <header>
                   <User size={18} />
-                  <input
-                    value={profileForm.name}
-                    onChange={(event) =>
-                      setProfileForm({ ...profileForm, name: event.target.value })
-                    }
-                    required
-                  />
-                </div>
-              </label>
+                  <h3>Account Info</h3>
+                </header>
 
-              <label>
-                <span>Email</span>
-                <div>
-                  <Mail size={18} />
-                  <input value={user?.email || ""} disabled />
-                </div>
-              </label>
+                <div className="profile-grid">
+                  <label>
+                    <span>Name</span>
+                    <div>
+                      <User size={18} />
+                      <input
+                        value={profileForm.name}
+                        onChange={(event) =>
+                          setProfileForm({ ...profileForm, name: event.target.value })
+                        }
+                        required
+                      />
+                    </div>
+                  </label>
 
-              <label>
-                <span>Phone</span>
-                <div>
-                  <Phone size={18} />
-                  <input
-                    value={profileForm.phone}
-                    onChange={(event) =>
-                      setProfileForm({ ...profileForm, phone: event.target.value })
-                    }
-                    placeholder="Phone number"
-                  />
-                </div>
-              </label>
+                  <label>
+                    <span>Email</span>
+                    <div>
+                      <Mail size={18} />
+                      <input value={user?.email || ""} disabled />
+                    </div>
+                  </label>
 
-              <label>
-                <span>Avatar URL</span>
-                <div>
-                  <Image size={18} />
-                  <input
-                    value={profileForm.avatar}
-                    onChange={(event) =>
-                      setProfileForm({ ...profileForm, avatar: event.target.value })
-                    }
-                    placeholder="https://example.com/photo.jpg"
-                  />
-                </div>
-              </label>
+                  <label>
+                    <span>Phone</span>
+                    <div>
+                      <Phone size={18} />
+                      <input
+                        value={profileForm.phone}
+                        onChange={(event) =>
+                          setProfileForm({ ...profileForm, phone: event.target.value })
+                        }
+                        placeholder="Phone number"
+                      />
+                    </div>
+                  </label>
 
-              <label>
-                <span>Telegram Chat ID</span>
-                <div>
-                  <Send size={18} />
-                  <input
-                    value={profileForm.telegramId}
-                    onChange={(event) =>
-                      setProfileForm({ ...profileForm, telegramId: event.target.value })
-                    }
-                    placeholder="123456789"
-                  />
-                </div>
-              </label>
+                  <label>
+                    <span>Avatar URL</span>
+                    <div>
+                      <Image size={18} />
+                      <input
+                        value={profileForm.avatar}
+                        onChange={(event) =>
+                          setProfileForm({ ...profileForm, avatar: event.target.value })
+                        }
+                        placeholder="https://example.com/photo.jpg"
+                      />
+                    </div>
+                  </label>
 
-              <label>
-                <span>WhatsApp ID</span>
-                <div>
-                  <Phone size={18} />
-                  <input
-                    value={profileForm.whatsappId}
-                    onChange={(event) =>
-                      setProfileForm({ ...profileForm, whatsappId: event.target.value })
-                    }
-                    placeholder="Optional"
-                  />
+                  <label>
+                    <span>Telegram Chat ID</span>
+                    <div>
+                      <Send size={18} />
+                      <input
+                        value={profileForm.telegramId}
+                        onChange={(event) =>
+                          setProfileForm({ ...profileForm, telegramId: event.target.value })
+                        }
+                        placeholder="123456789"
+                      />
+                    </div>
+                  </label>
+
+                  <label>
+                    <span>WhatsApp ID</span>
+                    <div>
+                      <Phone size={18} />
+                      <input
+                        value={profileForm.whatsappId}
+                        onChange={(event) =>
+                          setProfileForm({ ...profileForm, whatsappId: event.target.value })
+                        }
+                        placeholder="Optional"
+                      />
+                    </div>
+                  </label>
                 </div>
-              </label>
+              </section>
+
+              <section className="profile-section">
+                <header>
+                  <Settings size={18} />
+                  <h3>Notification Schedule</h3>
+                  <label className="toggle-control">
+                    <input
+                      type="checkbox"
+                      checked={profileForm.notificationsEnabled}
+                      onChange={(event) =>
+                        setProfileForm({
+                          ...profileForm,
+                          notificationsEnabled: event.target.checked,
+                        })
+                      }
+                    />
+                    <span />
+                  </label>
+                </header>
+
+                <div className="schedule-summary">
+                  {profileForm.notificationsEnabled
+                    ? profileForm.notificationFrequency === "weekly"
+                      ? `Weekly on ${DAYS_OF_WEEK[profileForm.notificationDayOfWeek]} at ${
+                          profileForm.notificationTime
+                        }`
+                      : `Daily at ${profileForm.notificationTime}`
+                    : "Notifications are turned off"}
+                </div>
+
+                <div className="profile-grid">
+                  <label>
+                    <span>Frequency</span>
+                    <div>
+                      <Settings size={18} />
+                      <select
+                        value={profileForm.notificationFrequency}
+                        onChange={(event) =>
+                          setProfileForm({
+                            ...profileForm,
+                            notificationFrequency: event.target.value,
+                          })
+                        }
+                        disabled={!profileForm.notificationsEnabled}
+                      >
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                      </select>
+                    </div>
+                  </label>
+
+                  <label>
+                    <span>Time</span>
+                    <div>
+                      <Bell size={18} />
+                      <input
+                        type="time"
+                        value={profileForm.notificationTime}
+                        onChange={(event) =>
+                          setProfileForm({
+                            ...profileForm,
+                            notificationTime: event.target.value,
+                          })
+                        }
+                        disabled={!profileForm.notificationsEnabled}
+                      />
+                    </div>
+                  </label>
+
+                  {profileForm.notificationFrequency === "weekly" && (
+                    <label>
+                      <span>Day of Week</span>
+                      <div>
+                        <CalendarDays size={18} />
+                        <select
+                          value={profileForm.notificationDayOfWeek}
+                          onChange={(event) =>
+                            setProfileForm({
+                              ...profileForm,
+                              notificationDayOfWeek: Number(event.target.value),
+                            })
+                          }
+                          disabled={!profileForm.notificationsEnabled}
+                        >
+                          {DAYS_OF_WEEK.map((day, index) => (
+                            <option value={index} key={day}>
+                              {day}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </label>
+                  )}
+                </div>
+              </section>
 
               <button type="submit" disabled={profileSaving}>
                 <Save size={18} />

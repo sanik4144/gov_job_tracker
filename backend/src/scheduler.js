@@ -1,16 +1,21 @@
 import cron from "node-cron";
 import { env } from "./config/env.js";
-import { runDailyJobCheck } from "./services/notifier.js";
+import { runDueUserNotificationChecks } from "./services/notifier.js";
 
 export function startScheduler() {
   cron.schedule(
-    env.dailyCron,
+    "* * * * *",
     async () => {
       try {
-        console.log("Running scheduled job check");
-        await runDailyJobCheck();
+        const result = await runDueUserNotificationChecks({ timezone: env.timezone });
+        if (result.due > 0) {
+          console.log("Ran scheduled user notification checks", {
+            due: result.due,
+            checkedAt: result.checkedAt,
+          });
+        }
       } catch (error) {
-        console.error("Scheduled job check failed:", error);
+        console.error("Scheduled user notification check failed:", error);
       }
     },
     {
@@ -18,5 +23,5 @@ export function startScheduler() {
     }
   );
 
-  console.log(`Scheduler registered: ${env.dailyCron} (${env.timezone})`);
+  console.log(`Scheduler registered: every minute (${env.timezone})`);
 }

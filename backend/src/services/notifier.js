@@ -21,6 +21,93 @@ export async function getUserKeywords(userId) {
   return [...new Set(keywords.map((keyword) => keyword.value))];
 }
 
+function getLocalScheduleParts(date, timezone) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour12: false,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const dayByName = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+
+  return {
+    time: `${values.hour}:${values.minute}`,
+    dayOfWeek: dayByName[values.weekday],
+  };
+}
+
+function alreadyCheckedThisMinute(user, now) {
+  if (!user.lastNotificationCheckAt) return false;
+
+  const lastRun = new Date(user.lastNotificationCheckAt);
+  return Math.floor(lastRun.getTime() / 60000) === Math.floor(now.getTime() / 60000);
+}
+
+function isUserDueForNotification(user, now, timezone) {
+  const notificationsEnabled = user.notificationsEnabled ?? true;
+  const notificationFrequency = user.notificationFrequency || "daily";
+  const notificationTime = user.notificationTime || "19:00";
+  const notificationDayOfWeek = user.notificationDayOfWeek ?? 0;
+
+  if (!notificationsEnabled || !user.telegramId) return false;
+  if (alreadyCheckedThisMinute(user, now)) return false;
+
+  const schedule = getLocalScheduleParts(now, timezone);
+  if (schedule.time !== notificationTime) return false;
+
+  if (notificationFrequency === "weekly") {
+    return schedule.dayOfWeek === notificationDayOfWeek;
+  }
+
+  return true;
+}
+
+export async function runDueUserNotificationChecks({ now = new Date(), timezone } = {}) {
+  const users = await User.find({
+    isActive: true,
+    notificationsEnabled: { $ne: false },
+    telegramId: { $nin: [null, ""] },
+  });
+  const dueUsers = users.filter((user) => isUserDueForNotification(user, now, timezone));
+  const results = [];
+
+  for (const user of dueUsers) {
+    try {
+      const keywords = await getUserKeywords(user._id);
+      const result = await runDailyJobCheck({
+        notify: true,
+        keywords,
+        notifyUserId: user._id,
+      });
+      user.lastNotificationCheckAt = now;
+      await user.save();
+      results.push({ userId: user._id, ok: true, result });
+    } catch (error) {
+      results.push({ userId: user._id, ok: false, error: error.message });
+      console.error("Scheduled user notification failed:", {
+        userId: user._id,
+        message: error.message,
+      });
+    }
+  }
+
+  return {
+    checkedAt: now.toISOString(),
+    due: dueUsers.length,
+    results,
+  };
+}
+
 async function getUserNotificationProfiles(userId = null) {
   const keywordFilter = { active: true, userId: { $ne: null } };
   if (userId) {

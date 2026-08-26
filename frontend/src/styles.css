@@ -309,15 +309,39 @@ button:disabled {
 
 .profile-form {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
+}
+
+.profile-section {
+  display: grid;
+  gap: 16px;
   border: 1px solid #d9e1da;
   border-radius: 8px;
   background: #ffffff;
   padding: 18px;
 }
 
-.profile-form label {
+.profile-section header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #eef1ed;
+  padding-bottom: 14px;
+}
+
+.profile-section h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.profile-grid label {
   display: grid;
   gap: 8px;
   color: #334139;
@@ -325,14 +349,13 @@ button:disabled {
   font-weight: 700;
 }
 
-.profile-form label:first-child,
-.profile-form label:nth-child(4),
-.profile-form label:nth-child(5),
-.profile-form button {
+.profile-grid label:first-child,
+.profile-grid label:nth-child(4),
+.profile-grid label:nth-child(5) {
   grid-column: 1 / -1;
 }
 
-.profile-form label > div {
+.profile-grid label > div {
   min-height: 46px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -346,7 +369,8 @@ button:disabled {
   font-weight: 400;
 }
 
-.profile-form input {
+.profile-form input,
+.profile-form select {
   width: 100%;
   min-height: 44px;
   border: 0;
@@ -356,8 +380,65 @@ button:disabled {
   font: inherit;
 }
 
-.profile-form input:disabled {
+.profile-form input:disabled,
+.profile-form select:disabled {
   color: #627068;
+}
+
+.schedule-summary {
+  border: 1px solid #d9e1da;
+  border-radius: 8px;
+  background: #f7fbf8;
+  color: #244633;
+  padding: 12px 14px;
+  font-weight: 700;
+}
+
+.toggle-control {
+  width: 52px;
+  height: 30px;
+  margin-left: auto;
+  display: block;
+  cursor: pointer;
+}
+
+.toggle-control input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggle-control span {
+  width: 52px;
+  height: 30px;
+  display: block;
+  border: 1px solid #aab8ad;
+  border-radius: 999px;
+  background: #eef1ed;
+  padding: 3px;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.toggle-control span::before {
+  content: "";
+  width: 22px;
+  height: 22px;
+  display: block;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(23, 33, 27, 0.18);
+  transition: transform 0.2s ease;
+}
+
+.toggle-control input:checked + span {
+  border-color: #276d4d;
+  background: #276d4d;
+}
+
+.toggle-control input:checked + span::before {
+  transform: translateX(22px);
 }
 
 .profile-form button {
@@ -759,7 +840,7 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .profile-form {
+  .profile-grid {
     grid-template-columns: 1fr;
   }
 

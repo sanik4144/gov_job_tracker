@@ -44,6 +44,30 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    notificationsEnabled: {
+      type: Boolean,
+      default: true,
+    },
+    notificationFrequency: {
+      type: String,
+      enum: ["daily", "weekly"],
+      default: "daily",
+    },
+    notificationTime: {
+      type: String,
+      default: "19:00",
+      match: /^([01]\d|2[0-3]):[0-5]\d$/,
+    },
+    notificationDayOfWeek: {
+      type: Number,
+      min: 0,
+      max: 6,
+      default: 0,
+    },
+    lastNotificationCheckAt: {
+      type: Date,
+      default: null,
+    },
     plan: {
       type: String,
       enum: ["free", "pro", "team"],

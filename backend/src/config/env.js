@@ -22,7 +22,6 @@ export const env = {
   cronSecret: process.env.CRON_SECRET,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
-  dailyCron: process.env.DAILY_CRON || "0 9 * * *",
   enableInternalScheduler: process.env.ENABLE_INTERNAL_SCHEDULER !== "false",
   timezone: process.env.TZ || "Asia/Dhaka",
   frontendOrigins: (process.env.FRONTEND_ORIGIN || defaultFrontendOrigins.join(","))
