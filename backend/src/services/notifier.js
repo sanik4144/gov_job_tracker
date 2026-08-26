@@ -16,8 +16,18 @@ export async function getActiveKeywords() {
   return [...new Set(keywords.map((keyword) => keyword.value))];
 }
 
-async function getUserNotificationProfiles() {
-  const keywords = await Keyword.find({ active: true, userId: { $ne: null } }).lean();
+export async function getUserKeywords(userId) {
+  const keywords = await Keyword.find({ active: true, userId }).sort({ value: 1 }).lean();
+  return [...new Set(keywords.map((keyword) => keyword.value))];
+}
+
+async function getUserNotificationProfiles(userId = null) {
+  const keywordFilter = { active: true, userId: { $ne: null } };
+  if (userId) {
+    keywordFilter.userId = userId;
+  }
+
+  const keywords = await Keyword.find(keywordFilter).lean();
   const users = await User.find({
     _id: { $in: keywords.map((keyword) => keyword.userId) },
     telegramId: { $nin: [null, ""] },
@@ -85,8 +95,12 @@ function formatGroupedDigest(newJobs, keywords) {
   return lines.join("\n");
 }
 
-export async function runDailyJobCheck({ notify = true } = {}) {
-  const keywords = await getActiveKeywords();
+export async function runDailyJobCheck({
+  notify = true,
+  keywords: providedKeywords = null,
+  notifyUserId = null,
+} = {}) {
+  const keywords = providedKeywords ? [...new Set(providedKeywords)] : await getActiveKeywords();
 
   if (keywords.length === 0) {
     return {
@@ -135,7 +149,7 @@ export async function runDailyJobCheck({ notify = true } = {}) {
       }
     }
 
-    const notificationProfiles = await getUserNotificationProfiles();
+    const notificationProfiles = await getUserNotificationProfiles(notifyUserId);
 
     for (const profile of notificationProfiles) {
       const userJobs = newJobs.filter((job) =>

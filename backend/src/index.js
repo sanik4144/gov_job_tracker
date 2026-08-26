@@ -7,7 +7,7 @@ import { Job } from "./models/Job.js";
 import { Keyword } from "./models/Keyword.js";
 import authRouter from "./routes/authRouter.js";
 import { startScheduler } from "./scheduler.js";
-import { runDailyJobCheck } from "./services/notifier.js";
+import { getUserKeywords, runDailyJobCheck } from "./services/notifier.js";
 
 requireEnv();
 
@@ -167,10 +167,20 @@ app.delete("/api/keywords/:id", authenticate, async (req, res, next) => {
 app.get("/api/jobs", authenticate, async (req, res, next) => {
   try {
     await ensureDbReady();
-    const filter = {};
-    if (req.query.keyword) {
-      filter.keywords = String(req.query.keyword);
+    const userKeywords = await getUserKeywords(req.user._id);
+    const requestedKeyword = String(req.query.keyword || "").trim();
+
+    if (userKeywords.length === 0) {
+      return res.json({ jobs: [] });
     }
+
+    if (requestedKeyword && !userKeywords.includes(requestedKeyword)) {
+      return res.json({ jobs: [] });
+    }
+
+    const filter = {
+      keywords: requestedKeyword || { $in: userKeywords },
+    };
     const includeExpired = req.query.includeExpired === "true";
     const resultLimit = req.query.applied === "true" ? undefined : 100;
     const appliedById = new Map(
@@ -212,6 +222,13 @@ app.patch("/api/jobs/:id/applied", authenticate, async (req, res, next) => {
     const job = await Job.findById(req.params.id).lean();
 
     if (!job) return res.status(404).json({ error: "Job not found" });
+
+    const userKeywords = await getUserKeywords(req.user._id);
+    const isUserJob = job.keywords?.some((keyword) => userKeywords.includes(keyword));
+
+    if (!isUserJob) {
+      return res.status(404).json({ error: "Job not found" });
+    }
 
     const existingAppliedJob = req.user.appliedJobs.find(
       (appliedJob) => appliedJob.job.toString() === req.params.id
@@ -288,7 +305,12 @@ async function handleRunDaily(req, res, next) {
       setImmediate(async () => {
         try {
           await ensureDbReady();
-          const result = await runDailyJobCheck({ notify: req.body?.notify !== false });
+          const userKeywords = req.user ? await getUserKeywords(req.user._id) : null;
+          const result = await runDailyJobCheck({
+            notify: req.body?.notify !== false,
+            keywords: userKeywords,
+            notifyUserId: req.user?._id,
+          });
           console.log("[run-daily] Background completed", {
             durationMs: Date.now() - startedAt,
             keywords: result.keywords,
@@ -311,7 +333,12 @@ async function handleRunDaily(req, res, next) {
 
     runDailyInProgress = true;
     await ensureDbReady();
-    const result = await runDailyJobCheck({ notify: req.body?.notify !== false });
+    const userKeywords = req.user ? await getUserKeywords(req.user._id) : null;
+    const result = await runDailyJobCheck({
+      notify: req.body?.notify !== false,
+      keywords: userKeywords,
+      notifyUserId: req.user?._id,
+    });
     runDailyInProgress = false;
     console.log("[run-daily] Completed", {
       durationMs: Date.now() - startedAt,
