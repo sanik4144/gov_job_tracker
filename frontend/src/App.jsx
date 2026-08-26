@@ -6,12 +6,16 @@ import {
   ClipboardCheck,
   ExternalLink,
   FileText,
+  Image,
   Lock,
   LogIn,
   LogOut,
   Mail,
+  Phone,
   Plus,
   RefreshCcw,
+  Save,
+  Send,
   Search,
   User,
   UserPlus,
@@ -19,7 +23,6 @@ import {
 } from "lucide-react";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-const CRON_SECRET = import.meta.env.VITE_CRON_SECRET || "";
 const AUTH_STORAGE_KEY = "gov-job-tracker-auth";
 
 export function App() {
@@ -27,7 +30,15 @@ export function App() {
   const [user, setUser] = useState(null);
   const [authMode, setAuthMode] = useState("login");
   const [authForm, setAuthForm] = useState({ name: "", email: "", password: "" });
+  const [profileForm, setProfileForm] = useState({
+    name: "",
+    phone: "",
+    avatar: "",
+    telegramId: "",
+    whatsappId: "",
+  });
   const [authLoading, setAuthLoading] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [appliedJobs, setAppliedJobs] = useState([]);
   const [keywords, setKeywords] = useState([]);
@@ -41,6 +52,16 @@ export function App() {
 
   const visibleJobs = activeView === "applied" ? appliedJobs : jobs;
   const emptyMessage = activeView === "applied" ? "No applied jobs yet" : "No saved jobs yet";
+
+  function syncProfileForm(nextUser) {
+    setProfileForm({
+      name: nextUser?.name || "",
+      phone: nextUser?.phone || "",
+      avatar: nextUser?.avatar || "",
+      telegramId: nextUser?.telegramId || "",
+      whatsappId: nextUser?.whatsappId || "",
+    });
+  }
 
   async function apiFetch(path, options = {}) {
     const headers = {
@@ -68,6 +89,7 @@ export function App() {
     localStorage.setItem(AUTH_STORAGE_KEY, authData.token);
     setToken(authData.token);
     setUser(authData.user);
+    syncProfileForm(authData.user);
     setAuthForm({ name: "", email: "", password: "" });
     setStatus("");
   }
@@ -76,6 +98,7 @@ export function App() {
     localStorage.removeItem(AUTH_STORAGE_KEY);
     setToken("");
     setUser(null);
+    syncProfileForm(null);
     setJobs([]);
     setAppliedJobs([]);
     setKeywords([]);
@@ -124,6 +147,26 @@ export function App() {
       setStatus(error.message);
     } finally {
       clearAuth();
+    }
+  }
+
+  async function saveProfile(event) {
+    event.preventDefault();
+    setProfileSaving(true);
+    setStatus("");
+
+    try {
+      const data = await apiFetch("/api/auth/profile", {
+        method: "PATCH",
+        body: JSON.stringify(profileForm),
+      });
+      setUser(data.user);
+      syncProfileForm(data.user);
+      setStatus("Profile updated successfully");
+    } catch (error) {
+      setStatus(error.message);
+    } finally {
+      setProfileSaving(false);
     }
   }
 
@@ -184,7 +227,7 @@ export function App() {
       setSelectedKeyword(nextSelected);
       await loadKeywords();
       await refreshJobs(nextSelected);
-      setStatus(`Removed ${value}. Deleted ${data.deletedJobs || 0} saved jobs.`);
+      setStatus(`Removed keyword: ${value}`);
     } catch (error) {
       setStatus(error.message);
     }
@@ -219,16 +262,10 @@ export function App() {
     setRunning(true);
     setStatus("");
     try {
-      const response = await fetch(`${API_BASE_URL}/api/run-daily`, {
+      const data = await apiFetch("/api/run-daily", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-cron-secret": CRON_SECRET,
-        },
         body: JSON.stringify({ notify: true }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Check failed");
       setStatus(
         `Checked ${data.found} jobs for ${data.keywords.length} keywords. New: ${data.new}.` +
           (data.notificationError ? ` Telegram: ${data.notificationError}` : "")
@@ -252,6 +289,7 @@ export function App() {
       try {
         const authData = await apiFetch("/api/auth/me");
         setUser(authData.user);
+        syncProfileForm(authData.user);
         await loadKeywords();
         await refreshJobs("");
       } catch (error) {
@@ -368,6 +406,14 @@ export function App() {
             Applied Jobs
             <span>{appliedJobs.length}</span>
           </button>
+          <button
+            type="button"
+            className={activeView === "profile" ? "active" : ""}
+            onClick={() => setActiveView("profile")}
+          >
+            <User size={18} />
+            Profile
+          </button>
         </nav>
 
         <div className="account-panel">
@@ -383,6 +429,104 @@ export function App() {
       </aside>
 
       <div className="content-panel">
+        {activeView === "profile" ? (
+          <section className="profile-view">
+            <div className="toolbar">
+              <div>
+                <h2>Profile</h2>
+                <p>Keep your contact and notification details current</p>
+              </div>
+            </div>
+
+            {status && <p className="status">{status}</p>}
+
+            <form className="profile-form" onSubmit={saveProfile}>
+              <label>
+                <span>Name</span>
+                <div>
+                  <User size={18} />
+                  <input
+                    value={profileForm.name}
+                    onChange={(event) =>
+                      setProfileForm({ ...profileForm, name: event.target.value })
+                    }
+                    required
+                  />
+                </div>
+              </label>
+
+              <label>
+                <span>Email</span>
+                <div>
+                  <Mail size={18} />
+                  <input value={user?.email || ""} disabled />
+                </div>
+              </label>
+
+              <label>
+                <span>Phone</span>
+                <div>
+                  <Phone size={18} />
+                  <input
+                    value={profileForm.phone}
+                    onChange={(event) =>
+                      setProfileForm({ ...profileForm, phone: event.target.value })
+                    }
+                    placeholder="Phone number"
+                  />
+                </div>
+              </label>
+
+              <label>
+                <span>Avatar URL</span>
+                <div>
+                  <Image size={18} />
+                  <input
+                    value={profileForm.avatar}
+                    onChange={(event) =>
+                      setProfileForm({ ...profileForm, avatar: event.target.value })
+                    }
+                    placeholder="https://example.com/photo.jpg"
+                  />
+                </div>
+              </label>
+
+              <label>
+                <span>Telegram Chat ID</span>
+                <div>
+                  <Send size={18} />
+                  <input
+                    value={profileForm.telegramId}
+                    onChange={(event) =>
+                      setProfileForm({ ...profileForm, telegramId: event.target.value })
+                    }
+                    placeholder="123456789"
+                  />
+                </div>
+              </label>
+
+              <label>
+                <span>WhatsApp ID</span>
+                <div>
+                  <Phone size={18} />
+                  <input
+                    value={profileForm.whatsappId}
+                    onChange={(event) =>
+                      setProfileForm({ ...profileForm, whatsappId: event.target.value })
+                    }
+                    placeholder="Optional"
+                  />
+                </div>
+              </label>
+
+              <button type="submit" disabled={profileSaving}>
+                <Save size={18} />
+                {profileSaving ? "Saving" : "Save Profile"}
+              </button>
+            </form>
+          </section>
+        ) : (
+          <>
         <section className="toolbar">
           <div>
             <h2>{activeView === "applied" ? "Applied Jobs" : "Jobs"}</h2>
@@ -529,6 +673,8 @@ export function App() {
             ))
           )}
         </section>
+          </>
+        )}
       </div>
 
       {pdfJob && (

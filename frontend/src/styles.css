@@ -302,6 +302,71 @@ button:disabled {
   color: #244633;
 }
 
+.profile-view {
+  display: grid;
+  gap: 24px;
+}
+
+.profile-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  border: 1px solid #d9e1da;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 18px;
+}
+
+.profile-form label {
+  display: grid;
+  gap: 8px;
+  color: #334139;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.profile-form label:first-child,
+.profile-form label:nth-child(4),
+.profile-form label:nth-child(5),
+.profile-form button {
+  grid-column: 1 / -1;
+}
+
+.profile-form label > div {
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #d9e1da;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 0 12px;
+  color: #5c6d61;
+  font-weight: 400;
+}
+
+.profile-form input {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  outline: 0;
+  color: #17211b;
+  background: transparent;
+  font: inherit;
+}
+
+.profile-form input:disabled {
+  color: #627068;
+}
+
+.profile-form button {
+  justify-content: center;
+  border-color: #276d4d;
+  background: #276d4d;
+  color: #ffffff;
+}
+
 .keyword-panel {
   display: grid;
   gap: 14px;
@@ -643,6 +708,10 @@ button:disabled {
   }
 
   .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-form {
     grid-template-columns: 1fr;
   }
 

@@ -18,7 +18,6 @@ export const env = {
         .filter(Boolean)
     : [],
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,
-  telegramChatId: process.env.TELEGRAM_CHAT_ID,
   jobSearchUrl: process.env.JOB_SEARCH_URL || "https://alljobs.teletalk.com.bd",
   cronSecret: process.env.CRON_SECRET,
   jwtSecret: process.env.JWT_SECRET,
@@ -33,7 +32,7 @@ export const env = {
 };
 
 export function requireEnv() {
-  const required = ["mongodbUri", "telegramBotToken", "telegramChatId", "cronSecret", "jwtSecret"];
+  const required = ["mongodbUri", "telegramBotToken", "cronSecret", "jwtSecret"];
   const missing = required.filter((key) => !env[key]);
 
   if (missing.length) {

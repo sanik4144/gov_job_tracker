@@ -104,6 +104,20 @@ function buildAdvertisementUrl(job) {
   return job.advertisementUrl || "";
 }
 
+function authorizeRunDaily(req, res, next) {
+  const cronSecret = req.header("x-cron-secret");
+
+  if (cronSecret) {
+    if (env.cronSecret && cronSecret === env.cronSecret) {
+      return next();
+    }
+
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  return authenticate(req, res, next);
+}
+
 app.get("/api/keywords", authenticate, async (req, res, next) => {
   try {
     await ensureDbReady();
@@ -254,11 +268,6 @@ async function handleRunDaily(req, res, next) {
   });
 
   try {
-    if (env.cronSecret && req.header("x-cron-secret") !== env.cronSecret) {
-      console.warn("[run-daily] Unauthorized request", requestSource);
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
     if (runDailyInProgress) {
       console.log("[run-daily] Already running", requestSource);
       return res.status(202).json({
@@ -323,8 +332,8 @@ async function handleRunDaily(req, res, next) {
   }
 }
 
-app.get("/api/run-daily", handleRunDaily);
-app.post("/api/run-daily", handleRunDaily);
+app.get("/api/run-daily", authorizeRunDaily, handleRunDaily);
+app.post("/api/run-daily", authorizeRunDaily, handleRunDaily);
 
 app.use((error, _req, res, _next) => {
   console.error(error);

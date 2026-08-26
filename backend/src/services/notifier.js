@@ -1,5 +1,6 @@
 import { Job } from "../models/Job.js";
 import { Keyword } from "../models/Keyword.js";
+import User from "../models/User.js";
 import { fetchJobs } from "./scraper.js";
 import { sendTelegramMessage } from "./telegram.js";
 
@@ -11,8 +12,38 @@ function escapeHtml(value = "") {
 }
 
 export async function getActiveKeywords() {
-  const keywords = await Keyword.find({ active: true }).sort({ value: 1 }).lean();
+  const keywords = await Keyword.find({ active: true, userId: { $ne: null } }).sort({ value: 1 }).lean();
   return [...new Set(keywords.map((keyword) => keyword.value))];
+}
+
+async function getUserNotificationProfiles() {
+  const keywords = await Keyword.find({ active: true, userId: { $ne: null } }).lean();
+  const users = await User.find({
+    _id: { $in: keywords.map((keyword) => keyword.userId) },
+    telegramId: { $nin: [null, ""] },
+    isActive: true,
+  }).lean();
+  const usersById = new Map(users.map((user) => [user._id.toString(), user]));
+  const profilesByUserId = new Map();
+
+  for (const keyword of keywords) {
+    const user = usersById.get(keyword.userId.toString());
+    if (!user) continue;
+
+    const userId = user._id.toString();
+    const profile = profilesByUserId.get(userId) || {
+      user,
+      keywords: [],
+    };
+
+    profile.keywords.push(keyword.value);
+    profilesByUserId.set(userId, profile);
+  }
+
+  return [...profilesByUserId.values()].map((profile) => ({
+    ...profile,
+    keywords: [...new Set(profile.keywords)],
+  }));
 }
 
 function formatGroupedDigest(newJobs, keywords) {
@@ -70,7 +101,7 @@ export async function runDailyJobCheck({ notify = true } = {}) {
 
   const scrapedJobs = await fetchJobs(keywords);
   const newJobs = [];
-  let notificationError = null;
+  const notificationErrors = [];
 
   for (const scrapedJob of scrapedJobs) {
     const existing = await Job.findOne({ externalId: scrapedJob.externalId });
@@ -104,11 +135,27 @@ export async function runDailyJobCheck({ notify = true } = {}) {
       }
     }
 
-    try {
-      await sendTelegramMessage(formatGroupedDigest(newJobs, keywords));
-    } catch (error) {
-      notificationError = error.response?.data?.description || error.message;
-      console.error("Telegram notification failed:", notificationError);
+    const notificationProfiles = await getUserNotificationProfiles();
+
+    for (const profile of notificationProfiles) {
+      const userJobs = newJobs.filter((job) =>
+        job.keywords?.some((keyword) => profile.keywords.includes(keyword))
+      );
+
+      try {
+        await sendTelegramMessage(
+          formatGroupedDigest(userJobs, profile.keywords),
+          profile.user.telegramId
+        );
+      } catch (error) {
+        const message = error.response?.data?.description || error.message;
+        notificationErrors.push({
+          userId: profile.user._id,
+          chatId: profile.user.telegramId,
+          message,
+        });
+        console.error("Telegram notification failed:", message);
+      }
     }
   }
 
@@ -117,7 +164,8 @@ export async function runDailyJobCheck({ notify = true } = {}) {
     keywords,
     found: scrapedJobs.length,
     new: newJobs.length,
-    notificationError,
+    notificationError: notificationErrors[0]?.message || null,
+    notificationErrors,
     jobs: newJobs,
   };
 }

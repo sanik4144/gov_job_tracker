@@ -92,6 +92,30 @@ export const getCurrentUser = async (req, res) => {
   return res.json({ user: req.user.toSafeJSON() });
 };
 
+export const updateProfile = async (req, res) => {
+  const allowedFields = ["name", "phone", "avatar", "telegramId", "whatsappId"];
+
+  for (const field of allowedFields) {
+    if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+      req.user[field] = typeof req.body[field] === "string" ? req.body[field].trim() : req.body[field];
+    }
+  }
+
+  if (!req.user.name) {
+    return res.status(400).json({ message: "Name is required" });
+  }
+
+  try {
+    await req.user.save();
+    return res.json({
+      message: "Profile updated successfully",
+      user: req.user.toSafeJSON(),
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
 export const logoutUser = (_req, res) => {
   return res.json({ message: 'Logged out successfully' });
 };
