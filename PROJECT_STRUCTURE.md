@@ -20,6 +20,9 @@ Use this structure for future work. Keep UI behavior and business rules in small
   - Mongoose schemas and schema methods only.
 - `src/middleware/`
   - Express middleware such as auth and route authorization.
+- `src/scripts/`
+  - One-off and repeatable maintenance scripts, such as seeders.
+  - Scripts must be idempotent where possible.
 - `src/utils/`
   - Pure helpers for formatting, parsing, and response view models.
 - `src/config/`
@@ -50,6 +53,8 @@ Use this structure for future work. Keep UI behavior and business rules in small
 
 - Add new backend endpoints as `route -> controller -> service/model`.
 - Add new frontend sidebar screens as a new route in `App.jsx` and a page under `src/pages/`.
+- Add admin backend endpoints under `src/routes/adminRouter.js` or a dedicated admin router, protected by `authenticate` and `requireAdmin`.
+- Add admin frontend pages under `src/pages/` and expose them in the sidebar only when `user.role === "admin"`.
 - Keep route paths real and shareable, for example `/jobs`, `/applied`, `/profile`.
 - Keep user-private data enforced on the backend, even if the frontend already filters it.
 - Do not place new API calls directly inside presentational components.

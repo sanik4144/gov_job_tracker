@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import { env, requireEnv } from "./config/env.js";
 import { initDbConnection } from "./db.js";
+import adminRouter from "./routes/adminRouter.js";
 import authRouter from "./routes/authRouter.js";
 import jobRouter from "./routes/jobRouter.js";
 import keywordRouter from "./routes/keywordRouter.js";
@@ -38,6 +39,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/admin", adminRouter);
 app.use("/api/keywords", keywordRouter);
 app.use("/api/jobs", jobRouter);
 app.use("/api/run-daily", runCheckRouter);

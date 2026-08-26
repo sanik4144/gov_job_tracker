@@ -5,6 +5,7 @@ import { LoaderPopup } from "./components/LoaderPopup.jsx";
 import { PdfModal } from "./components/PdfModal.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
 import { DashboardProvider, useDashboard } from "./context/DashboardContext.jsx";
+import { AdminUsersPage } from "./pages/AdminUsersPage.jsx";
 import { AppliedJobsPage } from "./pages/AppliedJobsPage.jsx";
 import { AuthPage } from "./pages/AuthPage.jsx";
 import { JobsPage } from "./pages/JobsPage.jsx";
@@ -67,6 +68,7 @@ function ProtectedApp() {
           <Route path="jobs" element={<JobsPage onOpenPdf={setPdfJob} />} />
           <Route path="applied" element={<AppliedJobsPage onOpenPdf={setPdfJob} />} />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="admin/users" element={<AdminUsersPage />} />
           <Route path="*" element={<Navigate to="/jobs" replace />} />
         </Route>
       </Routes>

@@ -458,6 +458,86 @@ button:disabled {
   color: #ffffff;
 }
 
+.admin-view {
+  display: grid;
+  gap: 24px;
+}
+
+.admin-user-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-user-card {
+  display: grid;
+  gap: 16px;
+  border: 1px solid #d9e1da;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 18px;
+}
+
+.admin-user-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid #eef1ed;
+  padding-bottom: 14px;
+}
+
+.admin-user-card h3 {
+  margin: 0;
+  color: #17211b;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.admin-user-card p {
+  margin-top: 4px;
+  color: #5c6d61;
+  font-size: 14px;
+}
+
+.role-badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #eef1ed;
+  color: #334139;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.role-badge.admin {
+  background: #e8f1eb;
+  color: #244633;
+}
+
+.admin-user-card dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.admin-user-card dl div {
+  min-width: 0;
+}
+
+.admin-user-card dt {
+  color: #627068;
+  font-size: 13px;
+}
+
+.admin-user-card dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+  color: #17211b;
+  font-weight: 700;
+}
+
 .keyword-panel {
   display: grid;
   gap: 14px;
@@ -852,6 +932,10 @@ button:disabled {
   }
 
   .profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-card dl {
     grid-template-columns: 1fr;
   }
 

@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, ClipboardCheck, LogOut, User } from "lucide-react";
+import { BriefcaseBusiness, ClipboardCheck, LogOut, ShieldCheck, User } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -27,6 +27,12 @@ export function AppLayout({ appliedCount, onLogout }) {
             <User size={18} />
             Profile
           </NavLink>
+          {user?.role === "admin" && (
+            <NavLink to="/admin/users">
+              <ShieldCheck size={18} />
+              Admin
+            </NavLink>
+          )}
         </nav>
 
         <div className="account-panel">
