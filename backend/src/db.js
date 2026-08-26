@@ -3,6 +3,9 @@ import dns from "node:dns";
 import { env } from "./config/env.js";
 import { Keyword } from "./models/Keyword.js";
 
+let dbReadyPromise = null;
+let dbConnectionError = null;
+
 export async function connectDb() {
   if (!env.mongodbUri) {
     throw new Error("MONGODB_URI is required");
@@ -17,6 +20,24 @@ export async function connectDb() {
   await dropLegacyKeywordIndexes();
   await Keyword.createIndexes();
   console.log("MongoDB connected");
+}
+
+export function initDbConnection() {
+  dbReadyPromise = connectDb().catch((error) => {
+    dbConnectionError = error;
+    console.error("MongoDB connection failed:", error);
+    throw error;
+  });
+
+  return dbReadyPromise;
+}
+
+export async function ensureDbReady() {
+  if (dbConnectionError) throw dbConnectionError;
+  if (!dbReadyPromise) {
+    dbReadyPromise = initDbConnection();
+  }
+  await dbReadyPromise;
 }
 
 async function dropLegacyKeywordIndexes() {

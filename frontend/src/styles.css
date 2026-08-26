@@ -146,15 +146,25 @@ a {
   gap: 8px;
 }
 
-.sidebar-nav button {
+.sidebar-nav button,
+.sidebar-nav a {
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
   width: 100%;
   justify-content: flex-start;
   border-color: transparent;
   background: transparent;
   color: #334139;
+  text-decoration: none;
 }
 
-.sidebar-nav button.active {
+.sidebar-nav button.active,
+.sidebar-nav a.active {
   border-color: #276d4d;
   background: #e8f1eb;
   color: #244633;
@@ -827,7 +837,8 @@ button:disabled {
     grid-template-columns: 1fr 1fr;
   }
 
-  .sidebar-nav button {
+  .sidebar-nav button,
+  .sidebar-nav a {
     justify-content: center;
   }
 
