@@ -7,7 +7,7 @@ import { Job } from "./models/Job.js";
 import { Keyword } from "./models/Keyword.js";
 import authRouter from "./routes/authRouter.js";
 import { startScheduler } from "./scheduler.js";
-import { getUserKeywords, runDailyJobCheck } from "./services/notifier.js";
+import { getUserKeywords, runDailyJobCheck, scrapeAndSaveJobs } from "./services/notifier.js";
 
 requireEnv();
 
@@ -141,7 +141,25 @@ app.post("/api/keywords", authenticate, async (req, res, next) => {
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
-    res.status(201).json({ keyword });
+    let search = {
+      found: 0,
+      new: 0,
+      error: null,
+    };
+
+    try {
+      const searchResult = await scrapeAndSaveJobs([keyword.value]);
+      search = {
+        found: searchResult.found,
+        new: searchResult.new,
+        error: null,
+      };
+    } catch (error) {
+      search.error = error.response?.data?.message || error.message;
+      console.error("Keyword search failed:", search.error);
+    }
+
+    res.status(201).json({ keyword, search });
   } catch (error) {
     next(error);
   }

@@ -46,6 +46,7 @@ export function App() {
   const [newKeyword, setNewKeyword] = useState("");
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [busyMessage, setBusyMessage] = useState("");
   const [status, setStatus] = useState("");
   const [activeView, setActiveView] = useState("jobs");
   const [pdfJob, setPdfJob] = useState(null);
@@ -193,8 +194,14 @@ export function App() {
     setAppliedJobs(data.jobs || []);
   }
 
-  async function refreshJobs(keyword = selectedKeyword) {
-    await Promise.all([loadJobs(keyword), loadAppliedJobs()]);
+  async function refreshJobs(keyword = selectedKeyword, { showLoader = false } = {}) {
+    if (showLoader) setBusyMessage("Refreshing jobs");
+
+    try {
+      await Promise.all([loadJobs(keyword), loadAppliedJobs()]);
+    } finally {
+      if (showLoader) setBusyMessage("");
+    }
   }
 
   async function addKeyword(event) {
@@ -202,6 +209,7 @@ export function App() {
     const value = newKeyword.trim();
     if (!value) return;
 
+    setBusyMessage("Searching jobs");
     try {
       const data = await apiFetch("/api/keywords", {
         method: "POST",
@@ -211,9 +219,17 @@ export function App() {
       setSelectedKeyword(data.keyword.value);
       await loadKeywords();
       await refreshJobs(data.keyword.value);
-      setStatus(`Saved keyword: ${data.keyword.value}`);
+      setStatus(
+        data.search?.error
+          ? `Saved keyword: ${data.keyword.value}. Search failed: ${data.search.error}`
+          : `Saved keyword: ${data.keyword.value}. Found ${data.search?.found || 0} jobs, new: ${
+              data.search?.new || 0
+            }.`
+      );
     } catch (error) {
       setStatus(error.message);
+    } finally {
+      setBusyMessage("");
     }
   }
 
@@ -260,6 +276,7 @@ export function App() {
 
   async function runCheck() {
     setRunning(true);
+    setBusyMessage("Running job check");
     setStatus("");
     try {
       const data = await apiFetch("/api/run-daily", {
@@ -276,6 +293,7 @@ export function App() {
       setStatus(error.message);
     } finally {
       setRunning(false);
+      setBusyMessage("");
     }
   }
 
@@ -538,7 +556,12 @@ export function App() {
           </div>
 
           <div className="actions">
-            <button type="button" onClick={() => refreshJobs()} disabled={loading} title="Refresh jobs">
+            <button
+              type="button"
+              onClick={() => refreshJobs(selectedKeyword, { showLoader: true })}
+              disabled={loading}
+              title="Refresh jobs"
+            >
               <RefreshCcw size={18} />
               Refresh
             </button>
@@ -676,6 +699,16 @@ export function App() {
           </>
         )}
       </div>
+
+      {busyMessage && (
+        <div className="loader-backdrop" role="status" aria-live="polite" aria-label={busyMessage}>
+          <div className="loader-popup">
+            <span className="loader-spinner" aria-hidden="true" />
+            <strong>{busyMessage}</strong>
+            <p>Please wait</p>
+          </div>
+        </div>
+      )}
 
       {pdfJob && (
         <div className="pdf-modal-backdrop" role="presentation" onClick={() => setPdfJob(null)}>

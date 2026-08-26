@@ -95,27 +95,9 @@ function formatGroupedDigest(newJobs, keywords) {
   return lines.join("\n");
 }
 
-export async function runDailyJobCheck({
-  notify = true,
-  keywords: providedKeywords = null,
-  notifyUserId = null,
-} = {}) {
-  const keywords = providedKeywords ? [...new Set(providedKeywords)] : await getActiveKeywords();
-
-  if (keywords.length === 0) {
-    return {
-      checkedAt: new Date().toISOString(),
-      keywords,
-      found: 0,
-      new: 0,
-      notificationError: null,
-      jobs: [],
-    };
-  }
-
+export async function scrapeAndSaveJobs(keywords) {
   const scrapedJobs = await fetchJobs(keywords);
   const newJobs = [];
-  const notificationErrors = [];
 
   for (const scrapedJob of scrapedJobs) {
     const existing = await Job.findOne({ externalId: scrapedJob.externalId });
@@ -139,6 +121,35 @@ export async function runDailyJobCheck({
     const created = await Job.create(scrapedJob);
     newJobs.push(created);
   }
+
+  return {
+    found: scrapedJobs.length,
+    new: newJobs.length,
+    jobs: newJobs,
+  };
+}
+
+export async function runDailyJobCheck({
+  notify = true,
+  keywords: providedKeywords = null,
+  notifyUserId = null,
+} = {}) {
+  const keywords = providedKeywords ? [...new Set(providedKeywords)] : await getActiveKeywords();
+
+  if (keywords.length === 0) {
+    return {
+      checkedAt: new Date().toISOString(),
+      keywords,
+      found: 0,
+      new: 0,
+      notificationError: null,
+      jobs: [],
+    };
+  }
+
+  const scrapeResult = await scrapeAndSaveJobs(keywords);
+  const newJobs = scrapeResult.jobs;
+  const notificationErrors = [];
 
   if (notify) {
     if (newJobs.length > 0) {
@@ -176,8 +187,8 @@ export async function runDailyJobCheck({
   return {
     checkedAt: new Date().toISOString(),
     keywords,
-    found: scrapedJobs.length,
-    new: newJobs.length,
+    found: scrapeResult.found,
+    new: scrapeResult.new,
     notificationError: notificationErrors[0]?.message || null,
     notificationErrors,
     jobs: newJobs,
