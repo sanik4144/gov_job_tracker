@@ -19,6 +19,10 @@ function formatSchedule(user) {
   return `Daily at ${user.notificationTime || "19:00"}`;
 }
 
+function Badge({ tone = "neutral", children }) {
+  return <span className={`status-badge ${tone}`}>{children}</span>;
+}
+
 export function AdminUsersPage() {
   const { user, apiFetch } = useAuth();
   const [users, setUsers] = useState([]);
@@ -58,72 +62,75 @@ export function AdminUsersPage() {
 
       <StatusMessage message={status} />
 
-      <section className="admin-user-list" aria-busy={loading}>
+      <section className="admin-table-panel" aria-busy={loading}>
         {loading ? (
           <div className="empty">Loading users</div>
         ) : users.length === 0 ? (
           <div className="empty">No users found</div>
         ) : (
-          users.map((item) => (
-            <article className="admin-user-card" key={item._id}>
-              <header>
-                <div>
-                  <h3>{item.name}</h3>
-                  <p>{item.email}</p>
-                </div>
-                <span className={item.role === "admin" ? "role-badge admin" : "role-badge"}>
-                  {item.role}
-                </span>
-              </header>
-
-              <dl>
-                <div>
-                  <dt>Phone</dt>
-                  <dd>{item.phone || "Not set"}</dd>
-                </div>
-                <div>
-                  <dt>Telegram Chat ID</dt>
-                  <dd>{item.telegramId || "Not set"}</dd>
-                </div>
-                <div>
-                  <dt>WhatsApp ID</dt>
-                  <dd>{item.whatsappId || "Not set"}</dd>
-                </div>
-                <div>
-                  <dt>Plan</dt>
-                  <dd>{item.plan || "free"}</dd>
-                </div>
-                <div>
-                  <dt>Subscription</dt>
-                  <dd>{item.subscriptionStatus || "free"}</dd>
-                </div>
-                <div>
-                  <dt>Notifications</dt>
-                  <dd>{formatSchedule(item)}</dd>
-                </div>
-                <div>
-                  <dt>Keywords</dt>
-                  <dd>{item.keywordCount || 0}</dd>
-                </div>
-                <div>
-                  <dt>Applied Jobs</dt>
-                  <dd>{item.appliedJobCount || 0}</dd>
-                </div>
-                <div>
-                  <dt>Active</dt>
-                  <dd>{item.isActive ? "Yes" : "No"}</dd>
-                </div>
-                <div>
-                  <dt>Created</dt>
-                  <dd>{formatDate(item.createdAt)}</dd>
-                </div>
-                <div>
-                  <dt>Updated</dt>
-                  <dd>{formatDate(item.updatedAt)}</dd>
-                </div>
-              </dl>
-            </article>
-          ))
+          <div className="admin-table-wrap">
+            <table className="admin-users-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Whatsapp</th>
+                  <th>Telegram</th>
+                  <th>Subscription</th>
+                  <th>Notifications</th>
+                  <th>Keywords</th>
+                  <th>Applied</th>
+                  <th>Created</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((item) => (
+                  <tr key={item._id}>
+                    <td>
+                      <strong>{item.name}</strong>
+                      <span>{item.email}</span>
+                    </td>
+                    <td>
+                      <Badge tone={item.role === "admin" ? "success" : "neutral"}>{item.role}</Badge>
+                    </td>
+                    <td>
+                      <Badge tone={item.isActive ? "success" : "danger"}>
+                        {item.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </td>
+                    <td>
+                      <strong>{item.phone || "Not set"}</strong>
+                      <span>{item.whatsappId ? `WhatsApp: ${item.whatsappId}` : "WhatsApp not set"}</span>
+                    </td>
+                    <td>
+                      <Badge tone={item.telegramId ? "success" : "warning"}>
+                        {item.telegramId ? "Connected" : "Missing"}
+                      </Badge>
+                      <span>{item.telegramId || "Not set"}</span>
+                    </td>
+                    <td>
+                      <strong>{item.plan || "free"}</strong>
+                      <Badge tone={item.subscriptionStatus === "free" ? "neutral" : "success"}>
+                        {item.subscriptionStatus || "free"}
+                      </Badge>
+                    </td>
+                    <td>
+                      <Badge tone={item.notificationsEnabled ? "success" : "muted"}>
+                        {item.notificationsEnabled ? "On" : "Off"}
+                      </Badge>
+                      <span>{formatSchedule(item)}</span>
+                    </td>
+                    <td>{item.keywordCount || 0}</td>
+                    <td>{item.appliedJobCount || 0}</td>
+                    <td>{formatDate(item.createdAt)}</td>
+                    <td>{formatDate(item.updatedAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </section>
