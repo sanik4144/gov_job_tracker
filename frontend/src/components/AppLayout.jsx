@@ -1,6 +1,7 @@
-import { BriefcaseBusiness, ClipboardCheck, LogOut, ShieldCheck, User, Users } from "lucide-react";
+import { Check, LogOut, ShieldCheck, User, Users } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import { ThemeToggle } from "./ThemeToggle.jsx";
 
 export function AppLayout({ appliedCount, onLogout }) {
   const { user } = useAuth();
@@ -15,17 +16,13 @@ export function AppLayout({ appliedCount, onLogout }) {
 
         <nav className="sidebar-nav">
           <NavLink to="/jobs">
-            <BriefcaseBusiness size={18} />
+            <span className="live-dot" aria-hidden="true" />
             Jobs
           </NavLink>
           <NavLink to="/applied">
-            <ClipboardCheck size={18} />
+            <Check size={18} />
             Applied Jobs
-            <span>{appliedCount}</span>
-          </NavLink>
-          <NavLink to="/profile">
-            <User size={18} />
-            Profile
+            <span className="nav-count">{appliedCount}</span>
           </NavLink>
         </nav>
 
@@ -43,14 +40,22 @@ export function AppLayout({ appliedCount, onLogout }) {
         )}
 
         <div className="account-panel">
-          <div>
-            <strong>{user?.name || "Account"}</strong>
-            <span>{user?.plan || "free"} plan</span>
+          <NavLink to="/profile" className="account-summary">
+            <span className="account-avatar" aria-hidden="true">
+              {(user?.name || "A").trim().charAt(0).toUpperCase()}
+            </span>
+            <span className="account-meta">
+              <strong>{user?.name || "Account"}</strong>
+              <span>{user?.plan || "free"} plan</span>
+            </span>
+          </NavLink>
+
+          <div className="account-actions">
+            <ThemeToggle className="icon-toggle" iconOnly />
+            <button type="button" className="icon-toggle" onClick={onLogout} title="Logout">
+              <LogOut size={17} />
+            </button>
           </div>
-          <button type="button" onClick={onLogout} title="Logout">
-            <LogOut size={18} />
-            Logout
-          </button>
         </div>
       </aside>
 

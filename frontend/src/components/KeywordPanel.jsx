@@ -1,4 +1,5 @@
 import { Plus, Search, X } from "lucide-react";
+import { useState } from "react";
 
 export function KeywordPanel({
   keywords,
@@ -9,21 +10,15 @@ export function KeywordPanel({
   onRemoveKeyword,
   onSelectKeyword,
 }) {
+  const [isAdding, setIsAdding] = useState(false);
+
+  async function handleAdd(event) {
+    await onAddKeyword(event);
+    setIsAdding(false);
+  }
+
   return (
     <section className="keyword-panel">
-      <form onSubmit={onAddKeyword}>
-        <Search size={18} />
-        <input
-          value={newKeyword}
-          onChange={(event) => onNewKeywordChange(event.target.value)}
-          placeholder="Add a job title keyword"
-        />
-        <button type="submit" title="Add keyword">
-          <Plus size={18} />
-          Add
-        </button>
-      </form>
-
       <div className="keyword-chips">
         <button
           type="button"
@@ -50,6 +45,37 @@ export function KeywordPanel({
             </button>
           </span>
         ))}
+      </div>
+
+      <div className="keyword-add-row">
+        {isAdding ? (
+          <form onSubmit={handleAdd}>
+            <Search size={16} />
+            <input
+              autoFocus
+              value={newKeyword}
+              onChange={(event) => onNewKeywordChange(event.target.value)}
+              placeholder="Add a job title to keyword"
+            />
+            <button type="submit" title="Add keyword">
+              <Plus size={16} />
+              Keyword
+            </button>
+            <button
+              type="button"
+              className="kw-cancel"
+              onClick={() => setIsAdding(false)}
+              title="Cancel"
+            >
+              <X size={16} />
+            </button>
+          </form>
+        ) : (
+          <button type="button" className="kw-add" onClick={() => setIsAdding(true)}>
+            <Plus size={14} />
+            New keyword
+          </button>
+        )}
       </div>
     </section>
   );

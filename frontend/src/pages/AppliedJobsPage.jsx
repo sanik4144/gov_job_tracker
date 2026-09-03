@@ -40,11 +40,11 @@ export function AppliedJobsPage({ onOpenPdf }) {
             title="Refresh jobs"
           >
             <RefreshCcw size={18} />
-            Refresh
+            Sync
           </button>
           <button type="button" onClick={runCheck} disabled={running} title="Run job check">
             <Bell size={18} />
-            {running ? "Checking" : "Run Check"}
+            {running ? "Scanning" : "Run Scan"}
           </button>
         </div>
       </section>

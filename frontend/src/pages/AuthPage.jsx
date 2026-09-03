@@ -1,7 +1,8 @@
-import { Lock, LogIn, Mail, User, UserPlus } from "lucide-react";
+import { Lock, LogIn, Mail, Radio, User, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { API_BASE_URL } from "../api/client.js";
 import { StatusMessage } from "../components/StatusMessage.jsx";
+import { ThemeToggle } from "../components/ThemeToggle.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export function AuthPage() {
@@ -44,8 +45,13 @@ export function AuthPage() {
 
   return (
     <main className="auth-shell">
+      <ThemeToggle className="theme-toggle" />
       <section className="auth-panel">
         <div className="auth-copy">
+          <p className="eyebrow">
+            <Radio size={14} />
+            Job keyword
+          </p>
           <h1>Gov Job Tracker</h1>
           <p>Sign in to manage your own keywords, saved jobs, and application progress.</p>
         </div>

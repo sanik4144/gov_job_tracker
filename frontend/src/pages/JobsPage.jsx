@@ -28,7 +28,7 @@ export function JobsPage({ onOpenPdf }) {
     <>
       <section className="toolbar">
         <div>
-          <h2>Jobs</h2>
+          <h2>Active Jobs</h2>
           <p>Daily government job alerts from AllJobs by Teletalk</p>
         </div>
 
@@ -40,11 +40,11 @@ export function JobsPage({ onOpenPdf }) {
             title="Refresh jobs"
           >
             <RefreshCcw size={18} />
-            Refresh
+            Sync
           </button>
           <button type="button" onClick={runCheck} disabled={running} title="Run job check">
             <Bell size={18} />
-            {running ? "Checking" : "Run Check"}
+            {running ? "Scanning" : "Run Scan"}
           </button>
         </div>
       </section>
