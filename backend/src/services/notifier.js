@@ -5,7 +5,7 @@ import { Keyword } from "../models/Keyword.js";
 import User from "../models/User.js";
 import { evaluateNotificationDue } from "./notificationSchedule.js";
 import { fetchJobs } from "./scraper.js";
-import { sendTelegramMessage } from "./telegram.js";
+import { describeTelegramError, sendTelegramMessage } from "./telegram.js";
 
 function escapeHtml(value = "") {
   return String(value || "")
@@ -256,13 +256,19 @@ export async function runDailyJobCheck({
           profile.user.telegramId
         );
       } catch (error) {
-        const message = error.response?.data?.description || error.message;
+        // Never let this collapse to an empty string: it used to fall through the
+        // `|| null` below and report a clean run for a digest that never sent.
+        const message = describeTelegramError(error);
         notificationErrors.push({
           userId: profile.user._id,
           chatId: profile.user.telegramId,
           message,
         });
-        console.error("Telegram notification failed:", message);
+        console.error("Telegram notification failed:", {
+          userId: String(profile.user._id),
+          chatId: profile.user.telegramId,
+          message,
+        });
       }
     }
   }
@@ -272,7 +278,7 @@ export async function runDailyJobCheck({
     keywords,
     found: scrapeResult.found,
     new: scrapeResult.new,
-    notificationError: notificationErrors[0]?.message || null,
+    notificationError: notificationErrors[0]?.message ?? null,
     notificationErrors,
     jobs: newJobs,
   };
