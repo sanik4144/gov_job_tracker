@@ -1,6 +1,9 @@
+import { env } from "../config/env.js";
+import { ensureDbReady } from "../db.js";
 import { Job } from "../models/Job.js";
 import { Keyword } from "../models/Keyword.js";
 import User from "../models/User.js";
+import { evaluateNotificationDue } from "./notificationSchedule.js";
 import { fetchJobs } from "./scraper.js";
 import { sendTelegramMessage } from "./telegram.js";
 
@@ -21,67 +24,34 @@ export async function getUserKeywords(userId) {
   return [...new Set(keywords.map((keyword) => keyword.value))];
 }
 
-function getLocalScheduleParts(date, timezone) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    hour12: false,
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  const dayByName = {
-    Sun: 0,
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-  };
-
-  return {
-    time: `${values.hour}:${values.minute}`,
-    dayOfWeek: dayByName[values.weekday],
-  };
-}
-
-function alreadyCheckedThisMinute(user, now) {
-  if (!user.lastNotificationCheckAt) return false;
-
-  const lastRun = new Date(user.lastNotificationCheckAt);
-  return Math.floor(lastRun.getTime() / 60000) === Math.floor(now.getTime() / 60000);
-}
-
-function isUserDueForNotification(user, now, timezone) {
-  const notificationsEnabled = user.notificationsEnabled ?? true;
-  const notificationFrequency = user.notificationFrequency || "daily";
-  const notificationTime = user.notificationTime || "19:00";
-  const notificationDayOfWeek = user.notificationDayOfWeek ?? 0;
-
-  if (!notificationsEnabled || !user.telegramId) return false;
-  if (alreadyCheckedThisMinute(user, now)) return false;
-
-  const schedule = getLocalScheduleParts(now, timezone);
-  if (schedule.time !== notificationTime) return false;
-
-  if (notificationFrequency === "weekly") {
-    return schedule.dayOfWeek === notificationDayOfWeek;
-  }
-
-  return true;
-}
-
 export async function runDueUserNotificationChecks({ now = new Date(), timezone } = {}) {
+  await ensureDbReady();
+
   const users = await User.find({
     isActive: true,
     notificationsEnabled: { $ne: false },
     telegramId: { $nin: [null, ""] },
   });
-  const dueUsers = users.filter((user) => isUserDueForNotification(user, now, timezone));
+
+  const dueUsers = [];
+  for (const user of users) {
+    const verdict = evaluateNotificationDue(user, now, timezone, {
+      catchUpMinutes: env.notificationCatchUpMinutes,
+      retryMinutes: env.notificationRetryMinutes,
+    });
+
+    if (verdict.due) dueUsers.push({ user, verdict });
+  }
+
   const results = [];
 
-  for (const user of dueUsers) {
+  for (const { user, verdict } of dueUsers) {
+    // Stamp the attempt before the work starts so a crash mid-run cannot turn into
+    // a retry storm, and so overlapping ticks never double-send the same slot.
+    // Success markers are written only after the digest actually goes out.
+    user.lastNotificationAttemptAt = now;
+    await user.save();
+
     try {
       const keywords = await getUserKeywords(user._id);
       const result = await runDailyJobCheck({
@@ -89,13 +59,29 @@ export async function runDueUserNotificationChecks({ now = new Date(), timezone 
         keywords,
         notifyUserId: user._id,
       });
+
+      if (result.notificationErrors.length > 0) {
+        throw new Error(result.notificationErrors[0].message);
+      }
+
+      user.lastNotifiedSlotAt = verdict.slot;
       user.lastNotificationCheckAt = now;
       await user.save();
-      results.push({ userId: user._id, ok: true, result });
+
+      console.log("Scheduled notification sent", {
+        userId: String(user._id),
+        slot: verdict.slot.toISOString(),
+        trigger: verdict.reason,
+        new: result.new,
+      });
+      results.push({ userId: user._id, ok: true, slot: verdict.slot, result });
     } catch (error) {
-      results.push({ userId: user._id, ok: false, error: error.message });
+      // The slot stays undelivered, so it is retried on a later tick until the
+      // catch-up window closes.
+      results.push({ userId: user._id, ok: false, slot: verdict.slot, error: error.message });
       console.error("Scheduled user notification failed:", {
-        userId: user._id,
+        userId: String(user._id),
+        slot: verdict.slot.toISOString(),
         message: error.message,
       });
     }
@@ -104,17 +90,29 @@ export async function runDueUserNotificationChecks({ now = new Date(), timezone 
   return {
     checkedAt: now.toISOString(),
     due: dueUsers.length,
+    sent: results.filter((entry) => entry.ok).length,
+    failed: results.filter((entry) => !entry.ok).length,
     results,
   };
 }
 
 async function getUserNotificationProfiles(userId = null) {
-  const keywordFilter = { active: true, userId: { $ne: null } };
+  // Targeted run (the Run Scan button, or a scheduled slot): the recipient is the
+  // user themself, not whoever happens to own keyword rows. This is what guarantees
+  // a digest goes out even when the user has no keywords and no new jobs.
   if (userId) {
-    keywordFilter.userId = userId;
+    const user = await User.findOne({
+      _id: userId,
+      isActive: true,
+      telegramId: { $nin: [null, ""] },
+    }).lean();
+
+    if (!user) return [];
+
+    return [{ user, keywords: await getUserKeywords(userId) }];
   }
 
-  const keywords = await Keyword.find(keywordFilter).lean();
+  const keywords = await Keyword.find({ active: true, userId: { $ne: null } }).lean();
   const users = await User.find({
     _id: { $in: keywords.map((keyword) => keyword.userId) },
     telegramId: { $nin: [null, ""] },
@@ -127,14 +125,11 @@ async function getUserNotificationProfiles(userId = null) {
     const user = usersById.get(keyword.userId.toString());
     if (!user) continue;
 
-    const userId = user._id.toString();
-    const profile = profilesByUserId.get(userId) || {
-      user,
-      keywords: [],
-    };
+    const key = user._id.toString();
+    const profile = profilesByUserId.get(key) || { user, keywords: [] };
 
     profile.keywords.push(keyword.value);
-    profilesByUserId.set(userId, profile);
+    profilesByUserId.set(key, profile);
   }
 
   return [...profilesByUserId.values()].map((profile) => ({
@@ -150,6 +145,15 @@ function formatGroupedDigest(newJobs, keywords) {
     "",
     `<b>New jobs:</b> ${newJobs.length}`,
   ];
+
+  if (keywords.length === 0) {
+    lines.push(
+      "",
+      "You have no active keywords yet.",
+      "Add keywords in the dashboard to start receiving job matches."
+    );
+    return lines.join("\n");
+  }
 
   if (newJobs.length === 0) {
     lines.push("", `No new jobs found for: ${escapeHtml(keywords.join(", "))}`);
@@ -223,18 +227,10 @@ export async function runDailyJobCheck({
 } = {}) {
   const keywords = providedKeywords ? [...new Set(providedKeywords)] : await getActiveKeywords();
 
-  if (keywords.length === 0) {
-    return {
-      checkedAt: new Date().toISOString(),
-      keywords,
-      found: 0,
-      new: 0,
-      notificationError: null,
-      jobs: [],
-    };
-  }
-
-  const scrapeResult = await scrapeAndSaveJobs(keywords);
+  // A user with no keywords still gets their scheduled digest — it just reports that
+  // there is nothing to match on yet — so this only skips the scrape, not the notify.
+  const scrapeResult =
+    keywords.length === 0 ? { found: 0, new: 0, jobs: [] } : await scrapeAndSaveJobs(keywords);
   const newJobs = scrapeResult.jobs;
   const notificationErrors = [];
 

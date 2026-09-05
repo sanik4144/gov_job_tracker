@@ -105,6 +105,14 @@ export const updateProfile = async (req, res) => {
     return res.status(400).json({ message: "Name is required" });
   }
 
+  const scheduleFields = [
+    "notificationsEnabled",
+    "notificationFrequency",
+    "notificationTime",
+    "notificationDayOfWeek",
+  ];
+  const previousSchedule = JSON.stringify(scheduleFields.map((field) => req.user[field]));
+
   if (Object.prototype.hasOwnProperty.call(req.body, "notificationsEnabled")) {
     req.user.notificationsEnabled = Boolean(req.body.notificationsEnabled);
   }
@@ -129,6 +137,12 @@ export const updateProfile = async (req, res) => {
       return res.status(400).json({ message: "Notification day must be between Sunday and Saturday" });
     }
     req.user.notificationDayOfWeek = dayOfWeek;
+  }
+
+  // Re-baseline the schedule so a newly chosen time never fires retroactively for a
+  // slot that already passed today under the old settings.
+  if (JSON.stringify(scheduleFields.map((field) => req.user[field])) !== previousSchedule) {
+    req.user.notificationScheduleUpdatedAt = new Date();
   }
 
   try {

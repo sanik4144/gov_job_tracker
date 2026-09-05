@@ -68,6 +68,23 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // The schedule slot that was last delivered successfully. Used instead of an
+    // exact clock match so a missed minute can still be caught up later.
+    lastNotifiedSlotAt: {
+      type: Date,
+      default: null,
+    },
+    // Last delivery attempt, successful or not. Spaces out retries of a failed slot.
+    lastNotificationAttemptAt: {
+      type: Date,
+      default: null,
+    },
+    // Stamped whenever the schedule itself changes, so editing the time never
+    // back-fires a slot that already passed under the previous settings.
+    notificationScheduleUpdatedAt: {
+      type: Date,
+      default: null,
+    },
     plan: {
       type: String,
       enum: ["free", "pro", "team"],

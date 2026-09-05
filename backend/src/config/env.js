@@ -23,6 +23,11 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
   enableInternalScheduler: process.env.ENABLE_INTERNAL_SCHEDULER !== "false",
+  // How late a missed schedule slot may still fire. Covers restarts, deploys and
+  // sleeping free-tier dynos so a user never silently loses a whole day.
+  notificationCatchUpMinutes: Number(process.env.NOTIFICATION_CATCHUP_MINUTES || 360),
+  // Minimum gap between retries when a slot's delivery failed and is still catchable.
+  notificationRetryMinutes: Number(process.env.NOTIFICATION_RETRY_MINUTES || 10),
   timezone: process.env.TZ || "Asia/Dhaka",
   frontendOrigins: (process.env.FRONTEND_ORIGIN || defaultFrontendOrigins.join(","))
     .split(",")
