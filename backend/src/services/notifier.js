@@ -1,6 +1,7 @@
 import { env } from "../config/env.js";
 import { ensureDbReady } from "../db.js";
 import { Job } from "../models/Job.js";
+import { JobNotification } from "../models/JobNotification.js";
 import { Keyword } from "../models/Keyword.js";
 import User from "../models/User.js";
 import { evaluateNotificationDue } from "./notificationSchedule.js";
@@ -138,8 +139,63 @@ async function getUserNotificationProfiles(userId = null) {
   }));
 }
 
+/**
+ * Jobs this user's keywords match that this user has not been sent yet.
+ *
+ * Deliberately not "jobs inserted by this scrape": job rows are shared, so another
+ * user scraping `programmer` first would otherwise leave nothing new for everyone
+ * else watching `programmer`.
+ */
+export async function getPendingJobsForUser(userId, keywords, { lookbackDays } = {}) {
+  if (!userId || keywords.length === 0) return [];
+
+  const days = lookbackDays ?? env.notificationJobLookbackDays;
+  const candidates = await Job.find({
+    keywords: { $in: keywords },
+    createdAt: { $gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) },
+  })
+    .sort({ createdAt: 1 })
+    .lean();
+
+  if (candidates.length === 0) return [];
+
+  const alreadySent = await JobNotification.find({
+    userId,
+    jobId: { $in: candidates.map((job) => job._id) },
+  })
+    .select("jobId")
+    .lean();
+  const sentIds = new Set(alreadySent.map((entry) => entry.jobId.toString()));
+
+  return candidates.filter((job) => !sentIds.has(job._id.toString()));
+}
+
+async function recordJobsNotified(userId, jobIds) {
+  if (!userId || jobIds.length === 0) return;
+
+  try {
+    await JobNotification.insertMany(
+      jobIds.map((jobId) => ({ userId, jobId, notifiedAt: new Date() })),
+      { ordered: false }
+    );
+  } catch (error) {
+    // Duplicate keys just mean a concurrent run already recorded it — that is the
+    // index doing its job, not a failure.
+    if (error.code !== 11000 && error.writeErrors?.some((item) => item.err?.code !== 11000)) {
+      throw error;
+    }
+  }
+}
+
+/**
+ * Builds the digest and reports exactly which jobs made it into the text.
+ *
+ * Only the reported jobs get marked as delivered, so anything trimmed by the
+ * length cap stays pending and appears in the next digest instead of being lost.
+ */
 function formatGroupedDigest(newJobs, keywords) {
   const maxLength = 3800;
+  const includedJobIds = new Set();
   const lines = [
     "<b>Government Job Tracker</b>",
     "",
@@ -152,12 +208,12 @@ function formatGroupedDigest(newJobs, keywords) {
       "You have no active keywords yet.",
       "Add keywords in the dashboard to start receiving job matches."
     );
-    return lines.join("\n");
+    return { text: lines.join("\n"), jobIds: [] };
   }
 
   if (newJobs.length === 0) {
     lines.push("", `No new jobs found for: ${escapeHtml(keywords.join(", "))}`);
-    return lines.join("\n");
+    return { text: lines.join("\n"), jobIds: [] };
   }
 
   for (const keyword of keywords) {
@@ -180,10 +236,11 @@ function formatGroupedDigest(newJobs, keywords) {
       }
 
       lines.push(...jobLines, "");
+      includedJobIds.add(String(job._id));
     }
   }
 
-  return lines.join("\n");
+  return { text: lines.join("\n"), jobIds: [...includedJobIds] };
 }
 
 export async function scrapeAndSaveJobs(keywords) {
@@ -233,6 +290,7 @@ export async function runDailyJobCheck({
     keywords.length === 0 ? { found: 0, new: 0, jobs: [] } : await scrapeAndSaveJobs(keywords);
   const newJobs = scrapeResult.jobs;
   const notificationErrors = [];
+  const notifiedCounts = new Map();
 
   if (notify) {
     if (newJobs.length > 0) {
@@ -246,15 +304,17 @@ export async function runDailyJobCheck({
     const notificationProfiles = await getUserNotificationProfiles(notifyUserId);
 
     for (const profile of notificationProfiles) {
-      const userJobs = newJobs.filter((job) =>
-        job.keywords?.some((keyword) => profile.keywords.includes(keyword))
-      );
+      // Per-user newness: what THIS user has not received yet, regardless of who
+      // scraped the job into the shared collection first.
+      const userJobs = await getPendingJobsForUser(profile.user._id, profile.keywords);
+      const digest = formatGroupedDigest(userJobs, profile.keywords);
 
       try {
-        await sendTelegramMessage(
-          formatGroupedDigest(userJobs, profile.keywords),
-          profile.user.telegramId
-        );
+        await sendTelegramMessage(digest.text, profile.user.telegramId);
+        // Recorded only after the send succeeds, so a failed digest is retried
+        // with the same jobs rather than silently marked delivered.
+        await recordJobsNotified(profile.user._id, digest.jobIds);
+        notifiedCounts.set(String(profile.user._id), digest.jobIds.length);
       } catch (error) {
         // Never let this collapse to an empty string: it used to fall through the
         // `|| null` below and report a clean run for a digest that never sent.
@@ -273,11 +333,16 @@ export async function runDailyJobCheck({
     }
   }
 
+  // For a targeted run, "new" means new *for that user* — otherwise the UI would
+  // report 0 while the digest it just triggered listed several jobs.
+  const deliveredToTarget = notifyUserId ? notifiedCounts.get(String(notifyUserId)) : null;
+
   return {
     checkedAt: new Date().toISOString(),
     keywords,
     found: scrapeResult.found,
-    new: scrapeResult.new,
+    new: deliveredToTarget ?? scrapeResult.new,
+    newlyDiscovered: scrapeResult.new,
     notificationError: notificationErrors[0]?.message ?? null,
     notificationErrors,
     jobs: newJobs,

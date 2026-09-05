@@ -28,6 +28,9 @@ export const env = {
   notificationCatchUpMinutes: Number(process.env.NOTIFICATION_CATCHUP_MINUTES || 360),
   // Minimum gap between retries when a slot's delivery failed and is still catchable.
   notificationRetryMinutes: Number(process.env.NOTIFICATION_RETRY_MINUTES || 10),
+  // How far back a user's first digest may reach. Bounds the backlog a brand-new
+  // user (or a newly added keyword) pulls in on its first delivery.
+  notificationJobLookbackDays: Number(process.env.NOTIFICATION_JOB_LOOKBACK_DAYS || 14),
   timezone: process.env.TZ || "Asia/Dhaka",
   frontendOrigins: (process.env.FRONTEND_ORIGIN || defaultFrontendOrigins.join(","))
     .split(",")

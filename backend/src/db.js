@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import dns from "node:dns";
 import { env } from "./config/env.js";
+import { JobNotification } from "./models/JobNotification.js";
 import { Keyword } from "./models/Keyword.js";
 
 let dbReadyPromise = null;
@@ -19,6 +20,7 @@ export async function connectDb() {
   await mongoose.connect(env.mongodbUri);
   await dropLegacyKeywordIndexes();
   await Keyword.createIndexes();
+  await JobNotification.createIndexes();
   console.log("MongoDB connected");
 }
 
