@@ -7,6 +7,7 @@ import authRouter from "./routes/authRouter.js";
 import jobRouter from "./routes/jobRouter.js";
 import keywordRouter from "./routes/keywordRouter.js";
 import runCheckRouter from "./routes/runCheckRouter.js";
+import telegramRouter from "./routes/telegramRouter.js";
 import { startScheduler } from "./scheduler.js";
 
 requireEnv();
@@ -43,6 +44,7 @@ app.use("/api/admin", adminRouter);
 app.use("/api/keywords", keywordRouter);
 app.use("/api/jobs", jobRouter);
 app.use("/api/run-daily", runCheckRouter);
+app.use("/api/telegram", telegramRouter);
 
 // Keep the original auth paths available while the frontend uses /api/auth/*.
 app.use(authRouter);

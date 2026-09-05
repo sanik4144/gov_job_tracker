@@ -105,3 +105,42 @@ export async function sendTelegramMessage(text, chatId, { attempts = 3 } = {}) {
   failure.telegramStatus = lastError?.response?.status ?? null;
   throw failure;
 }
+
+function apiUrl(method) {
+  return `https://api.telegram.org/bot${env.telegramBotToken}/${method}`;
+}
+
+/**
+ * Registers the webhook. `secret_token` is what Telegram echoes back in the
+ * X-Telegram-Bot-Api-Secret-Token header on every update.
+ *
+ * Note: this permanently disables getUpdates for this bot token.
+ */
+export async function setTelegramWebhook(url, secretToken) {
+  const response = await axios.post(apiUrl("setWebhook"), {
+    url,
+    secret_token: secretToken,
+    allowed_updates: ["message", "edited_message"],
+    drop_pending_updates: true,
+  });
+
+  return response.data;
+}
+
+export async function getTelegramWebhookInfo() {
+  const response = await axios.get(apiUrl("getWebhookInfo"));
+
+  return response.data;
+}
+
+export async function deleteTelegramWebhook() {
+  const response = await axios.post(apiUrl("deleteWebhook"), { drop_pending_updates: false });
+
+  return response.data;
+}
+
+export async function getTelegramBotInfo() {
+  const response = await axios.get(apiUrl("getMe"));
+
+  return response.data;
+}

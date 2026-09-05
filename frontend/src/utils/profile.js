@@ -13,7 +13,6 @@ export function buildProfileForm(user) {
     name: user?.name || "",
     phone: user?.phone || "",
     avatar: user?.avatar || "",
-    telegramId: user?.telegramId || "",
     whatsappId: user?.whatsappId || "",
     notificationsEnabled: user?.notificationsEnabled ?? true,
     notificationFrequency: user?.notificationFrequency || "daily",

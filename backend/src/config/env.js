@@ -18,6 +18,15 @@ export const env = {
         .filter(Boolean)
     : [],
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,
+  // Bot username without "@" — used to build the t.me deep link.
+  telegramBotUsername: (process.env.TELEGRAM_BOT_USERNAME || "").replace(/^@/, ""),
+  // Shared secret echoed by Telegram in X-Telegram-Bot-Api-Secret-Token. Without it
+  // the webhook is an open endpoint anyone can post forged updates to.
+  telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET,
+  // Public HTTPS origin of this backend, used to register the webhook URL.
+  publicBackendUrl: (process.env.PUBLIC_BACKEND_URL || "").replace(/\/+$/, ""),
+  // How long a Connect Telegram token / pairing code stays valid.
+  telegramLinkTtlMinutes: Number(process.env.TELEGRAM_LINK_TTL_MINUTES || 15),
   jobSearchUrl: process.env.JOB_SEARCH_URL || "https://alljobs.teletalk.com.bd",
   cronSecret: process.env.CRON_SECRET,
   jwtSecret: process.env.JWT_SECRET,

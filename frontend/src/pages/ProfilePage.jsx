@@ -5,12 +5,12 @@ import {
   Mail,
   Phone,
   Save,
-  Send,
   Settings,
   User,
 } from "lucide-react";
 import { useState } from "react";
 import { StatusMessage } from "../components/StatusMessage.jsx";
+import { TelegramConnect } from "../components/TelegramConnect.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { DAYS_OF_WEEK } from "../utils/profile.js";
 
@@ -108,19 +108,10 @@ export function ProfilePage() {
               </div>
             </label>
 
-            <label>
-              <span>Telegram Chat ID</span>
-              <div>
-                <Send size={18} />
-                <input
-                  value={profileForm.telegramId}
-                  onChange={(event) =>
-                    setProfileForm({ ...profileForm, telegramId: event.target.value })
-                  }
-                  placeholder="123456789"
-                />
-              </div>
-            </label>
+            <div className="profile-field profile-field--wide">
+              <span>Telegram</span>
+              <TelegramConnect />
+            </div>
 
             <label>
               <span>WhatsApp ID</span>

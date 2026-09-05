@@ -2,7 +2,9 @@ import mongoose from "mongoose";
 import dns from "node:dns";
 import { env } from "./config/env.js";
 import { JobNotification } from "./models/JobNotification.js";
+import { TelegramLinkToken } from "./models/TelegramLinkToken.js";
 import { Keyword } from "./models/Keyword.js";
+import User from "./models/User.js";
 
 let dbReadyPromise = null;
 let dbConnectionError = null;
@@ -21,6 +23,16 @@ export async function connectDb() {
   await dropLegacyKeywordIndexes();
   await Keyword.createIndexes();
   await JobNotification.createIndexes();
+  await TelegramLinkToken.createIndexes();
+
+  // A pre-existing duplicate telegramId would make this throw; that must not take
+  // the whole app down, so surface it and carry on.
+  try {
+    await User.createIndexes();
+  } catch (error) {
+    console.error("Could not build user indexes (duplicate telegramId?):", error.message);
+  }
+
   console.log("MongoDB connected");
 }
 

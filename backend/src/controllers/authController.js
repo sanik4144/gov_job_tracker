@@ -2,6 +2,11 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import User from '../models/User.js';
+import {
+  buildDeepLink,
+  createLinkToken,
+  unlinkTelegram,
+} from '../services/telegramLink.js';
 
 function createToken(user) {
   return jwt.sign({ userId: user._id.toString(), role: user.role }, env.jwtSecret, {
@@ -93,7 +98,9 @@ export const getCurrentUser = async (req, res) => {
 };
 
 export const updateProfile = async (req, res) => {
-  const allowedFields = ["name", "phone", "avatar", "telegramId", "whatsappId"];
+  // telegramId is deliberately absent: it is set only by the Telegram link flow, so
+  // a user cannot type someone else's chat ID and receive their job alerts.
+  const allowedFields = ["name", "phone", "avatar", "whatsappId"];
 
   for (const field of allowedFields) {
     if (Object.prototype.hasOwnProperty.call(req.body, field)) {
@@ -149,6 +156,34 @@ export const updateProfile = async (req, res) => {
     await req.user.save();
     return res.json({
       message: "Profile updated successfully",
+      user: req.user.toSafeJSON(),
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+export const startTelegramLink = async (req, res) => {
+  try {
+    const link = await createLinkToken(req.user._id);
+
+    return res.json({
+      code: link.code,
+      deepLink: buildDeepLink(link.token),
+      botUsername: env.telegramBotUsername || null,
+      expiresAt: link.expiresAt,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+export const disconnectTelegram = async (req, res) => {
+  try {
+    await unlinkTelegram(req.user);
+
+    return res.json({
+      message: "Telegram disconnected",
       user: req.user.toSafeJSON(),
     });
   } catch (error) {

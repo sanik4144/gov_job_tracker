@@ -118,6 +118,13 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+// One Telegram chat feeds exactly one account. Partial (not sparse) because null is
+// an indexed value — a plain unique index would reject every unlinked user after the first.
+userSchema.index(
+  { telegramId: 1 },
+  { unique: true, partialFilterExpression: { telegramId: { $type: "string" } } }
+);
+
 userSchema.methods.toSafeJSON = function toSafeJSON() {
   const user = this.toObject();
   delete user.password;

@@ -1347,3 +1347,186 @@ button:disabled {
     width: 100%;
   }
 }
+
+/* --- Telegram connect ---------------------------------------------------- */
+
+.profile-field {
+  display: grid;
+  gap: 8px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.profile-field--wide {
+  grid-column: 1 / -1;
+}
+
+.telegram-connect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 14px;
+}
+
+.telegram-connect__status {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  color: var(--text-faint);
+}
+
+.telegram-connect__status strong {
+  display: block;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.telegram-connect__status p {
+  margin: 2px 0 0;
+  color: var(--text-dim);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.telegram-connect--linked .telegram-connect__status > svg {
+  color: var(--good);
+}
+
+/* Wins over the blanket `.profile-form button` accent fill by coming later. */
+.telegram-connect button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  padding: 0 14px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.telegram-connect button:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+
+.telegram-connect button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.telegram-connect__steps {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+
+.telegram-connect__open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: none;
+}
+
+.telegram-connect__open:hover {
+  background: var(--accent-strong);
+}
+
+.telegram-connect__or,
+.telegram-connect__hint,
+.telegram-connect__error {
+  margin: 0;
+  color: var(--text-dim);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.telegram-connect__or strong {
+  color: var(--text);
+}
+
+.telegram-connect__hint {
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+
+.telegram-connect__error {
+  color: var(--critical);
+}
+
+.telegram-connect__code {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.telegram-connect__code code {
+  flex: 1 1 auto;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  padding: 12px 14px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-align: center;
+  /* The code gets read aloud and retyped — make it selectable and unambiguous. */
+  user-select: all;
+}
+
+@keyframes telegram-connect-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.telegram-connect .spin {
+  animation: telegram-connect-spin 1s linear infinite;
+}
+
+@media (max-width: 640px) {
+  .telegram-connect {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .telegram-connect button {
+    justify-content: center;
+  }
+}

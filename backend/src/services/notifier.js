@@ -170,6 +170,23 @@ export async function getPendingJobsForUser(userId, keywords, { lookbackDays } =
   return candidates.filter((job) => !sentIds.has(job._id.toString()));
 }
 
+/**
+ * Distinguishes "this chat is gone for good" from a transient failure. Telegram
+ * answers 403 when the user blocked the bot or deleted the account, and 400
+ * "chat not found" when the id no longer resolves — neither is worth retrying.
+ */
+function isUnreachableChatError(error) {
+  const status = error?.telegramStatus ?? error?.response?.status;
+  const description = String(error?.message || "").toLowerCase();
+
+  if (status === 403) return true;
+
+  return (
+    status === 400 &&
+    (description.includes("chat not found") || description.includes("user is deactivated"))
+  );
+}
+
 async function recordJobsNotified(userId, jobIds) {
   if (!userId || jobIds.length === 0) return;
 
@@ -319,6 +336,20 @@ export async function runDailyJobCheck({
         // Never let this collapse to an empty string: it used to fall through the
         // `|| null` below and report a clean run for a digest that never sent.
         const message = describeTelegramError(error);
+
+        // A blocked or deleted chat never recovers on its own, so drop the binding
+        // instead of retrying it on every scheduled run forever.
+        if (isUnreachableChatError(error)) {
+          await User.updateOne(
+            { _id: profile.user._id },
+            { $set: { telegramId: null } }
+          );
+          console.warn("[telegram] Cleared unreachable chat binding", {
+            userId: String(profile.user._id),
+            reason: message,
+          });
+        }
+
         notificationErrors.push({
           userId: profile.user._id,
           chatId: profile.user.telegramId,
