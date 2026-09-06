@@ -55,7 +55,13 @@ export function AdminPaymentsPage() {
     }
   }
 
-  if (user?.role !== "admin") {
+  // `user` is null until /me resolves. Without this first check, landing on the page
+  // directly or refreshing it redirects to /jobs before the role is even known.
+  if (!user) {
+    return <div className="empty">Loading</div>;
+  }
+
+  if (user.role !== "admin") {
     return <Navigate to="/jobs" replace />;
   }
 

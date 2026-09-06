@@ -27,11 +27,13 @@ export function ProfilePage() {
   const effectiveTime = entitlements.limits.notificationTime || profileForm.notificationTime;
   const [profileSaving, setProfileSaving] = useState(false);
   const [status, setStatus] = useState("");
+  const [statusTone, setStatusTone] = useState("info");
 
   async function saveProfile(event) {
     event.preventDefault();
     setProfileSaving(true);
     setStatus("");
+    setStatusTone("info");
 
     try {
       const data = await apiFetch("/api/auth/profile", {
@@ -40,8 +42,10 @@ export function ProfilePage() {
       });
       setUser(data.user);
       syncProfileForm(data.user);
+      setStatusTone("success");
       setStatus("Profile updated successfully");
     } catch (error) {
+      setStatusTone("error");
       setStatus(error.message);
     } finally {
       setProfileSaving(false);
@@ -57,7 +61,7 @@ export function ProfilePage() {
         </div>
       </div>
 
-      <StatusMessage message={status} />
+      <StatusMessage message={status} tone={statusTone} />
 
       <form className="profile-form" onSubmit={saveProfile}>
         <section className="profile-section">

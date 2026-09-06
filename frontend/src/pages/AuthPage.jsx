@@ -11,6 +11,7 @@ export function AuthPage() {
   const [authForm, setAuthForm] = useState({ name: "", email: "", password: "" });
   const [authLoading, setAuthLoading] = useState(false);
   const [status, setStatus] = useState("");
+  const [statusTone, setStatusTone] = useState("info");
 
   async function submitAuth(event) {
     event.preventDefault();
@@ -37,6 +38,7 @@ export function AuthPage() {
 
       saveAuth(data);
     } catch (error) {
+      setStatusTone("error");
       setStatus(error.message);
     } finally {
       setAuthLoading(false);
@@ -114,7 +116,7 @@ export function AuthPage() {
             />
           </label>
 
-          <StatusMessage message={status} />
+          <StatusMessage message={status} tone={statusTone} />
 
           <button className="auth-submit" type="submit" disabled={authLoading}>
             {authMode === "register" ? <UserPlus size={18} /> : <LogIn size={18} />}
