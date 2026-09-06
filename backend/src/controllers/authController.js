@@ -124,6 +124,12 @@ export const updateProfile = async (req, res) => {
     req.user.notificationsEnabled = Boolean(req.body.notificationsEnabled);
   }
 
+  // Not a schedule field: it changes what is sent at a slot, not when the slot is,
+  // so it must not re-baseline notificationScheduleUpdatedAt.
+  if (Object.prototype.hasOwnProperty.call(req.body, "deadlineRemindersEnabled")) {
+    req.user.deadlineRemindersEnabled = Boolean(req.body.deadlineRemindersEnabled);
+  }
+
   if (Object.prototype.hasOwnProperty.call(req.body, "notificationFrequency")) {
     if (!["daily", "weekly"].includes(req.body.notificationFrequency)) {
       return res.status(400).json({ message: "Notification frequency must be daily or weekly" });

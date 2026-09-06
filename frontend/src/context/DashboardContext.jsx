@@ -129,7 +129,9 @@ export function DashboardProvider({ children }) {
       });
       setStatus(
         `Checked ${data.found} jobs for ${data.keywords.length} keywords. New: ${data.new}.` +
-          (data.notificationError ? ` Telegram: ${data.notificationError}` : "")
+          (data.closingSoon ? ` Closing soon: ${data.closingSoon}.` : "") +
+          (data.notificationError ? ` Telegram: ${data.notificationError}` : "") +
+          (data.reminderError ? ` Reminder: ${data.reminderError}` : "")
       );
       await loadKeywords();
       await refreshJobs();

@@ -1,6 +1,7 @@
 import {
   Bell,
   CalendarDays,
+  Clock,
   Image,
   Mail,
   Phone,
@@ -12,7 +13,7 @@ import { useState } from "react";
 import { StatusMessage } from "../components/StatusMessage.jsx";
 import { TelegramConnect } from "../components/TelegramConnect.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { DAYS_OF_WEEK } from "../utils/profile.js";
+import { DAYS_OF_WEEK, DEADLINE_REMINDER_DAYS } from "../utils/profile.js";
 
 export function ProfilePage() {
   const { user, setUser, profileForm, setProfileForm, syncProfileForm, apiFetch } = useAuth();
@@ -113,7 +114,7 @@ export function ProfilePage() {
               <TelegramConnect />
             </div>
 
-            <label>
+            {/* <label>
               <span>WhatsApp ID</span>
               <div>
                 <Phone size={18} />
@@ -125,7 +126,7 @@ export function ProfilePage() {
                   placeholder="Optional"
                 />
               </div>
-            </label>
+            </label> */}
           </div>
         </section>
 
@@ -221,6 +222,32 @@ export function ProfilePage() {
                 </div>
               </label>
             )}
+          </div>
+        </section>
+
+        <section className="profile-section">
+          <header>
+            <Clock size={18} />
+            <h3>Deadline Reminders</h3>
+            <label className="toggle-control">
+              <input
+                type="checkbox"
+                checked={profileForm.deadlineRemindersEnabled}
+                onChange={(event) =>
+                  setProfileForm({
+                    ...profileForm,
+                    deadlineRemindersEnabled: event.target.checked,
+                  })
+                }
+              />
+              <span />
+            </label>
+          </header>
+
+          <div className="schedule-summary">
+            {profileForm.deadlineRemindersEnabled
+              ? `Sent with your scheduled alert when a matched job closes within ${DEADLINE_REMINDER_DAYS} days and you have not marked it applied. Each job is reminded once.`
+              : "Deadline reminders are turned off"}
           </div>
         </section>
 

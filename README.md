@@ -11,6 +11,21 @@ Daily Telegram alerts for saved government job title keywords from AllJobs by Te
 
 `JOB_KEYWORD` seeds the first keyword, currently `Assistant Programmer`. After that, keywords are managed from the frontend and saved in MongoDB. A daily check scans all active keywords, tags each saved job with its matched keyword, and sends one Telegram digest grouped by keyword.
 
+## Deadline Reminders
+
+Alongside the new-jobs digest, each scheduled run sends a **Closing Soon** message
+listing jobs that match the user's keywords, close within `DEADLINE_REMINDER_DAYS`
+(default 3), and have **not** been marked applied by that user.
+
+- A job is reminded once per deadline. If a circular's deadline is extended, it
+  earns exactly one fresh reminder.
+- Marking a job applied in the dashboard stops its reminder.
+- Users can switch reminders off independently of the digest, under
+  **Profile - Deadline Reminders**.
+- Deliveries are recorded in the `deadlinereminders` collection, keyed on
+  (user, job, deadline), which is also the idempotency guard — pressing Run Scan
+  twice cannot double-send.
+
 ## Render Free Tier Note
 
 Render free web services can sleep after inactivity. While the service is asleep, an in-process `node-cron` schedule will not run. For reliable free-tier daily alerts, use an external scheduler to call:

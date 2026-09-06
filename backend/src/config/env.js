@@ -40,6 +40,9 @@ export const env = {
   // How far back a user's first digest may reach. Bounds the backlog a brand-new
   // user (or a newly added keyword) pulls in on its first delivery.
   notificationJobLookbackDays: Number(process.env.NOTIFICATION_JOB_LOOKBACK_DAYS || 14),
+  // How many days ahead of a deadline the "closing soon" reminder fires. Each job
+  // is reminded once per deadline, the first time it enters this window.
+  deadlineReminderDays: Number(process.env.DEADLINE_REMINDER_DAYS || 3),
   timezone: process.env.TZ || "Asia/Dhaka",
   frontendOrigins: (process.env.FRONTEND_ORIGIN || defaultFrontendOrigins.join(","))
     .split(",")

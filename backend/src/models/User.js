@@ -48,6 +48,12 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Separate from notificationsEnabled: a user can want the new-jobs digest
+    // without the closing-soon nudges, or the other way around.
+    deadlineRemindersEnabled: {
+      type: Boolean,
+      default: true,
+    },
     notificationFrequency: {
       type: String,
       enum: ["daily", "weekly"],

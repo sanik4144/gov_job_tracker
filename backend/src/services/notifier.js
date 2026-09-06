@@ -1,9 +1,11 @@
 import { env } from "../config/env.js";
 import { ensureDbReady } from "../db.js";
+import { DeadlineReminder } from "../models/DeadlineReminder.js";
 import { Job } from "../models/Job.js";
 import { JobNotification } from "../models/JobNotification.js";
 import { Keyword } from "../models/Keyword.js";
 import User from "../models/User.js";
+import { getDeadlineMeta, getDeadlineWindow } from "../utils/jobView.js";
 import { evaluateNotificationDue } from "./notificationSchedule.js";
 import { fetchJobs } from "./scraper.js";
 import { describeTelegramError, sendTelegramMessage } from "./telegram.js";
@@ -74,6 +76,7 @@ export async function runDueUserNotificationChecks({ now = new Date(), timezone 
         slot: verdict.slot.toISOString(),
         trigger: verdict.reason,
         new: result.new,
+        closingSoon: result.closingSoon,
       });
       results.push({ userId: user._id, ok: true, slot: verdict.slot, result });
     } catch (error) {
@@ -260,6 +263,113 @@ function formatGroupedDigest(newJobs, keywords) {
   return { text: lines.join("\n"), jobIds: [...includedJobIds] };
 }
 
+/**
+ * Jobs this user is watching that close within the reminder window and that the
+ * user has not applied to yet.
+ *
+ * Applied state is read from `user.appliedJobs` rather than `Job.applied`: job rows
+ * are shared between users, so the flag on the job says nothing about this user.
+ */
+export async function getJobsClosingSoonForUser(user, keywords, { days } = {}) {
+  const windowDays = days ?? env.deadlineReminderDays;
+  if (!user?._id || keywords.length === 0 || !(windowDays >= 0)) return [];
+
+  const { from, to } = getDeadlineWindow(windowDays);
+  const candidates = await Job.find({
+    keywords: { $in: keywords },
+    deadline: { $gte: from, $lte: to },
+  })
+    .sort({ deadline: 1 })
+    .lean();
+
+  if (candidates.length === 0) return [];
+
+  const appliedJobIds = new Set((user.appliedJobs || []).map((entry) => String(entry.job)));
+  const openJobs = candidates.filter((job) => !appliedJobIds.has(String(job._id)));
+  if (openJobs.length === 0) return [];
+
+  const alreadyReminded = await DeadlineReminder.find({
+    userId: user._id,
+    jobId: { $in: openJobs.map((job) => job._id) },
+  })
+    .select("jobId deadline")
+    .lean();
+  const remindedKeys = new Set(
+    alreadyReminded.map((entry) => `${entry.jobId}:${entry.deadline}`)
+  );
+
+  return openJobs.filter((job) => !remindedKeys.has(`${job._id}:${job.deadline}`));
+}
+
+/**
+ * Builds the reminder and reports exactly which jobs made it into the text, so a
+ * job trimmed by the length cap stays unreminded and reappears next run.
+ */
+function formatDeadlineReminder(jobs) {
+  const maxLength = 3600;
+  const includedJobIds = new Set();
+  const lines = [
+    "<b>Closing Soon</b>",
+    "",
+    `${jobs.length} job${jobs.length === 1 ? "" : "s"} you have not applied to yet.`,
+  ];
+
+  for (const job of jobs) {
+    const { daysUntilDeadline } = getDeadlineMeta(job.deadline);
+    const urgency =
+      daysUntilDeadline === 0
+        ? "last day"
+        : `${daysUntilDeadline} day${daysUntilDeadline === 1 ? "" : "s"} left`;
+    // The leading blank separates entries, so it is added after the filter rather
+    // than being dropped by it.
+    const jobLines = [
+      "",
+      ...[
+        `<b>${escapeHtml(job.title)}</b>`,
+        job.organization ? `   ${escapeHtml(job.organization)}` : "",
+        `   Deadline: ${escapeHtml(job.deadline)} (${urgency})`,
+        job.detailUrl ? `   ${escapeHtml(job.detailUrl)}` : "",
+      ].filter(Boolean),
+    ];
+
+    if ([...lines, ...jobLines].join("\n").length > maxLength) {
+      lines.push("", `...and ${jobs.length - includedJobIds.size} more closing soon.`);
+      break;
+    }
+
+    lines.push(...jobLines);
+    includedJobIds.add(String(job._id));
+  }
+
+  lines.push("", "Mark a job as applied in the dashboard to stop its reminder.");
+
+  return {
+    text: lines.join("\n"),
+    jobs: jobs.filter((job) => includedJobIds.has(String(job._id))),
+  };
+}
+
+async function recordDeadlineReminders(userId, jobs) {
+  if (!userId || jobs.length === 0) return;
+
+  try {
+    await DeadlineReminder.insertMany(
+      jobs.map((job) => ({
+        userId,
+        jobId: job._id,
+        deadline: job.deadline,
+        remindedAt: new Date(),
+      })),
+      { ordered: false }
+    );
+  } catch (error) {
+    // Duplicate keys just mean a concurrent run already recorded it.
+    if (error.code !== 11000 && error.writeErrors?.some((item) => item.err?.code !== 11000)) {
+      throw error;
+    }
+  }
+}
+
 export async function scrapeAndSaveJobs(keywords) {
   const scrapedJobs = await fetchJobs(keywords);
   const newJobs = [];
@@ -307,7 +417,9 @@ export async function runDailyJobCheck({
     keywords.length === 0 ? { found: 0, new: 0, jobs: [] } : await scrapeAndSaveJobs(keywords);
   const newJobs = scrapeResult.jobs;
   const notificationErrors = [];
+  const reminderErrors = [];
   const notifiedCounts = new Map();
+  const remindedCounts = new Map();
 
   if (notify) {
     if (newJobs.length > 0) {
@@ -360,6 +472,34 @@ export async function runDailyJobCheck({
           chatId: profile.user.telegramId,
           message,
         });
+        // The reminder goes to the same chat, so it would fail too — and an
+        // unreachable chat has just been unlinked above.
+        continue;
+      }
+
+      if (profile.user.deadlineRemindersEnabled === false) continue;
+
+      try {
+        const closingJobs = await getJobsClosingSoonForUser(profile.user, profile.keywords);
+        if (closingJobs.length === 0) continue;
+
+        const reminder = formatDeadlineReminder(closingJobs);
+        await sendTelegramMessage(reminder.text, profile.user.telegramId);
+        // Recorded only after the send succeeds, and only for the jobs the text
+        // actually listed.
+        await recordDeadlineReminders(profile.user._id, reminder.jobs);
+        remindedCounts.set(String(profile.user._id), reminder.jobs.length);
+      } catch (error) {
+        // Non-fatal on purpose. Nothing was recorded, so these jobs are retried on
+        // the next run while they remain inside the window; failing the whole slot
+        // would re-send the digest that already went out.
+        const message = describeTelegramError(error);
+        reminderErrors.push({ userId: profile.user._id, message });
+        console.error("Deadline reminder failed:", {
+          userId: String(profile.user._id),
+          chatId: profile.user.telegramId,
+          message,
+        });
       }
     }
   }
@@ -367,6 +507,8 @@ export async function runDailyJobCheck({
   // For a targeted run, "new" means new *for that user* — otherwise the UI would
   // report 0 while the digest it just triggered listed several jobs.
   const deliveredToTarget = notifyUserId ? notifiedCounts.get(String(notifyUserId)) : null;
+  const remindedToTarget = notifyUserId ? remindedCounts.get(String(notifyUserId)) : null;
+  const totalReminded = [...remindedCounts.values()].reduce((total, count) => total + count, 0);
 
   return {
     checkedAt: new Date().toISOString(),
@@ -374,8 +516,11 @@ export async function runDailyJobCheck({
     found: scrapeResult.found,
     new: deliveredToTarget ?? scrapeResult.new,
     newlyDiscovered: scrapeResult.new,
+    closingSoon: remindedToTarget ?? totalReminded,
     notificationError: notificationErrors[0]?.message ?? null,
     notificationErrors,
+    reminderError: reminderErrors[0]?.message ?? null,
+    reminderErrors,
     jobs: newJobs,
   };
 }
