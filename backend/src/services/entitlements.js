@@ -7,14 +7,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // a rejected payment, or an admin switching someone off — so it gets no grace.
 const LIVE_STATUSES = new Set(["active", "trialing", "past_due"]);
 
-/**
- * The plan a user is actually entitled to right now.
- *
- * This is the ONLY function in the codebase that reads `user.plan`. Everything else
- * asks for limits and features through the helpers below, which is what stops plan
- * checks from scattering into controllers and drifting apart.
- */
-export function resolvePlanKey(user, now = new Date()) {
+// The plan the user owns outright, ignoring any pending-payment hold.
+function resolveOwnedPlanKey(user, now) {
   const storedKey = user?.plan;
   const plan = storedKey ? PLANS[storedKey] : null;
 
@@ -38,6 +32,36 @@ export function resolvePlanKey(user, now = new Date()) {
   return now.getTime() < expiresAt + env.subscriptionGraceDays * DAY_MS
     ? storedKey
     : FREE_PLAN_KEY;
+}
+
+/**
+ * A plan held open by a submitted-but-unverified payment.
+ *
+ * Only ever set for users who have paid before, so it covers renewal lag without
+ * handing free days to a made-up transaction ID.
+ */
+function resolveHeldPlanKey(user, now) {
+  const heldKey = user?.subscriptionHoldPlan;
+  const plan = heldKey ? PLANS[heldKey] : null;
+  if (!plan || plan.priceBdt === 0 || !user.subscriptionHoldUntil) return FREE_PLAN_KEY;
+
+  const until = new Date(user.subscriptionHoldUntil).getTime();
+  if (Number.isNaN(until)) return FREE_PLAN_KEY;
+
+  return now.getTime() < until ? heldKey : FREE_PLAN_KEY;
+}
+
+/**
+ * The plan a user is actually entitled to right now.
+ *
+ * This is the ONLY function in the codebase that reads `user.plan`. Everything else
+ * asks for limits and features through the helpers below, which is what stops plan
+ * checks from scattering into controllers and drifting apart.
+ */
+export function resolvePlanKey(user, now = new Date()) {
+  const owned = resolveOwnedPlanKey(user, now);
+
+  return owned === FREE_PLAN_KEY ? resolveHeldPlanKey(user, now) : owned;
 }
 
 export function getPlan(user, now = new Date()) {
@@ -92,6 +116,9 @@ export function getEntitlements(user, now = new Date()) {
       : null,
     // Past the end date but still working, on borrowed time.
     inGrace: planKey !== FREE_PLAN_KEY && hasExpiry && expiresAt.getTime() <= now.getTime(),
+    // Running on a submitted payment that an admin has not verified yet.
+    onHold:
+      planKey !== FREE_PLAN_KEY && resolveOwnedPlanKey(user, now) === FREE_PLAN_KEY,
     limits: plan.limits,
     features: plan.features,
   };

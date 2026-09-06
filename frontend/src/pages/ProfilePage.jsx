@@ -10,13 +10,21 @@ import {
   User,
 } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { StatusMessage } from "../components/StatusMessage.jsx";
 import { TelegramConnect } from "../components/TelegramConnect.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { DAYS_OF_WEEK, DEADLINE_REMINDER_DAYS } from "../utils/profile.js";
+import { DAYS_OF_WEEK, WEEK_DISPLAY_ORDER } from "../utils/profile.js";
+import { describeReminderStages } from "../utils/plan.js";
 
 export function ProfilePage() {
-  const { user, setUser, profileForm, setProfileForm, syncProfileForm, apiFetch } = useAuth();
+  const { user, setUser, profileForm, setProfileForm, syncProfileForm, apiFetch, entitlements } =
+    useAuth();
+  const canPickTime = entitlements.features.customNotificationTime;
+  const canPickWeekly = entitlements.features.weeklyDigest;
+  // A fixed-time plan sends at the plan's time regardless of what is stored, so show
+  // the time that will actually be used rather than the stored one.
+  const effectiveTime = entitlements.limits.notificationTime || profileForm.notificationTime;
   const [profileSaving, setProfileSaving] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -151,12 +159,16 @@ export function ProfilePage() {
 
           <div className="schedule-summary">
             {profileForm.notificationsEnabled
-              ? profileForm.notificationFrequency === "weekly"
-                ? `Weekly on ${DAYS_OF_WEEK[profileForm.notificationDayOfWeek]} at ${
-                    profileForm.notificationTime
-                  }`
-                : `Daily at ${profileForm.notificationTime}`
+              ? profileForm.notificationFrequency === "weekly" && canPickWeekly
+                ? `Weekly on ${DAYS_OF_WEEK[profileForm.notificationDayOfWeek]} at ${effectiveTime}`
+                : `Daily at ${effectiveTime}`
               : "Notifications are turned off"}
+            {!canPickTime && profileForm.notificationsEnabled ? (
+              <>
+                {" "}
+                <Link to="/billing">Upgrade to choose your own time</Link>
+              </>
+            ) : null}
           </div>
 
           <div className="profile-grid">
@@ -175,7 +187,9 @@ export function ProfilePage() {
                   disabled={!profileForm.notificationsEnabled}
                 >
                   <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
+                  <option value="weekly" disabled={!canPickWeekly}>
+                    Weekly{canPickWeekly ? "" : " (Pro)"}
+                  </option>
                 </select>
               </div>
             </label>
@@ -186,14 +200,15 @@ export function ProfilePage() {
                 <Bell size={18} />
                 <input
                   type="time"
-                  value={profileForm.notificationTime}
+                  value={effectiveTime}
                   onChange={(event) =>
                     setProfileForm({
                       ...profileForm,
                       notificationTime: event.target.value,
                     })
                   }
-                  disabled={!profileForm.notificationsEnabled}
+                  disabled={!profileForm.notificationsEnabled || !canPickTime}
+                  title={canPickTime ? "" : "Your plan sends at a fixed time"}
                 />
               </div>
             </label>
@@ -213,9 +228,9 @@ export function ProfilePage() {
                     }
                     disabled={!profileForm.notificationsEnabled}
                   >
-                    {DAYS_OF_WEEK.map((day, index) => (
-                      <option value={index} key={day}>
-                        {day}
+                    {WEEK_DISPLAY_ORDER.map((dayIndex) => (
+                      <option value={dayIndex} key={dayIndex}>
+                        {DAYS_OF_WEEK[dayIndex]}
                       </option>
                     ))}
                   </select>
@@ -245,9 +260,19 @@ export function ProfilePage() {
           </header>
 
           <div className="schedule-summary">
-            {profileForm.deadlineRemindersEnabled
-              ? `Sent with your scheduled alert when a matched job closes within ${DEADLINE_REMINDER_DAYS} days and you have not marked it applied. Each job is reminded once.`
-              : "Deadline reminders are turned off"}
+            {profileForm.deadlineRemindersEnabled ? (
+              <>
+                {`Sent ${describeReminderStages(entitlements.limits.reminderStages)} for jobs you have not marked applied.`}
+                {entitlements.limits.reminderStages.length < 2 ? (
+                  <>
+                    {" "}
+                    <Link to="/billing">Upgrade for earlier reminders</Link>
+                  </>
+                ) : null}
+              </>
+            ) : (
+              "Deadline reminders are turned off"
+            )}
           </div>
         </section>
 

@@ -1,5 +1,8 @@
+import { PLANS } from "../config/plans.js";
 import { ensureDbReady } from "../db.js";
 import { getUserKeywords, runDailyJobCheck } from "../services/notifier.js";
+import { consumeManualScan, refundManualScan } from "../services/scanQuota.js";
+import { sendPlanLimit } from "../utils/planErrors.js";
 
 let runDailyInProgress = false;
 
@@ -24,6 +27,9 @@ export async function runCheck(req, res, next) {
     time: new Date().toISOString(),
   });
 
+  // Declared out here so the catch below can refund a scan the run never used.
+  let quota = null;
+
   try {
     if (runDailyInProgress) {
       console.log("[run-daily] Already running", requestSource);
@@ -34,12 +40,35 @@ export async function runCheck(req, res, next) {
       });
     }
 
+    // Metered only for signed-in users. Cron requests carry no user and are not
+    // charged against anyone's allowance.
+    if (req.user) {
+      await ensureDbReady();
+      quota = await consumeManualScan(req.user);
+
+      if (!quota.allowed) {
+        console.log("[run-daily] Scan quota exhausted", {
+          userId: String(req.user._id),
+          limit: quota.limit,
+        });
+
+        return sendPlanLimit(res, {
+          feature: "manualScansPerDay",
+          limit: quota.limit,
+          message:
+            `You have used today's ${quota.limit} manual scan${quota.limit === 1 ? "" : "s"}. ` +
+            `Upgrade to Pro for ${PLANS.pro.limits.manualScansPerDay} scans a day.`,
+        });
+      }
+    }
+
     if (runInBackground) {
       runDailyInProgress = true;
       res.status(202).json({
         accepted: true,
         running: true,
         message: "Daily job check started",
+        scanQuota: quota,
       });
 
       setImmediate(async () => {
@@ -54,6 +83,9 @@ export async function runCheck(req, res, next) {
             notificationError: result.notificationError,
           });
         } catch (error) {
+          // A run that never happened should not cost a scan, least of all a free
+          // user's only one for the day.
+          await refundManualScan(req.user, quota?.day);
           console.error("[run-daily] Background failed", {
             durationMs: Date.now() - startedAt,
             message: error.message,
@@ -78,9 +110,10 @@ export async function runCheck(req, res, next) {
       notificationError: result.notificationError,
     });
 
-    res.json(result);
+    res.json({ ...result, scanQuota: quota });
   } catch (error) {
     runDailyInProgress = false;
+    await refundManualScan(req.user, quota?.day);
     console.error("[run-daily] Failed", {
       durationMs: Date.now() - startedAt,
       message: error.message,

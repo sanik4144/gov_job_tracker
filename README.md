@@ -14,16 +14,22 @@ Daily Telegram alerts for saved government job title keywords from AllJobs by Te
 ## Deadline Reminders
 
 Alongside the new-jobs digest, each scheduled run sends a **Closing Soon** message
-listing jobs that match the user's keywords, close within `DEADLINE_REMINDER_DAYS`
-(default 3), and have **not** been marked applied by that user.
+listing jobs that match the user's keywords, are near their deadline, and have
+**not** been marked applied by that user.
 
-- A job is reminded once per deadline. If a circular's deadline is extended, it
-  earns exactly one fresh reminder.
+The rungs come from the plan: free gets the last day only, Pro gets 3 days, 1 day
+and the last day (`limits.reminderStages` in `backend/src/config/plans.js`).
+
+- A rung fires when the deadline has *reached* it, not only when it equals it, so a
+  rung missed because a run failed still fires late instead of being skipped.
+- Several rungs owed at once collapse into a single message.
+- A job is reminded once per rung per deadline. If a circular's deadline is
+  extended, the whole ladder re-arms.
 - Marking a job applied in the dashboard stops its reminder.
 - Users can switch reminders off independently of the digest, under
   **Profile - Deadline Reminders**.
 - Deliveries are recorded in the `deadlinereminders` collection, keyed on
-  (user, job, deadline), which is also the idempotency guard — pressing Run Scan
+  (user, job, deadline, stage), which is also the idempotency guard — pressing Run Scan
   twice cannot double-send.
 
 ## Plans
@@ -46,7 +52,39 @@ A paid plan stays active while `subscriptionStatus` is live **and**
 covers the lag between a user sending payment and an admin verifying it manually;
 `canceled` is an explicit revocation and gets no grace.
 
-Nothing is enforced yet - limits are published to the client but not applied.
+### Enforcement
+
+- Keyword count and the daily manual-scan allowance are enforced in the controllers
+  that own them, and refused with **HTTP 402** carrying `code`, `feature`, `limit`
+  and `upgradeTo` so the client can offer an upgrade rather than a generic error.
+- Digest time, digest frequency and the reminder ladder are enforced **inside the
+  notifier**, because the scheduler never passes through Express. A lapsed Pro keeps
+  `weekly` and a custom time on their record and is still delivered the free
+  schedule, with nothing having to rewrite their document.
+- A failed scan is refunded, so a transient scrape error does not burn a free user's
+  only scan of the day.
+
+## Billing
+
+Payment is manual bKash. The user sends money, submits the transaction ID on
+`/billing`, and an admin verifies it under **Admin - Payments**.
+
+- `Payment` is an append-only ledger; `user.plan` and `user.subscriptionEndsAt` are a
+  derived cache of what it says. Admin grants go through the same ledger, so "why is
+  this user Pro?" is always answerable.
+- Approval extends rather than replaces:
+  `subscriptionEndsAt = max(now, currentEnd) + periodDays`. Renewing early stacks the
+  new period on what is left; renewing late starts from today.
+- The transaction ID is unique per provider, normalized for case and spaces. That is
+  the idempotency guard against a resubmitted TrxID and a double-clicked Approve.
+- A submitted-but-unverified renewal holds the plan open for `PAYMENT_HOLD_DAYS`,
+  but only for users with a previously approved payment - so verification lag never
+  cuts off a real subscriber, and an invented TrxID buys nobody free days.
+- Renewal notices ride the existing Telegram pipeline at 3 days, 1 day, expiry day
+  and grace-end, keyed on `subscriptionEndsAt` so renewing re-arms the ladder.
+- `npm run expire:subs` (or the daily in-process cron) marks lapsed records
+  `canceled`. It is cosmetic: entitlements resolve from the date, so a run that never
+  happens grants nobody access.
 
 ## Render Free Tier Note
 

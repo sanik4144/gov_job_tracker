@@ -60,6 +60,9 @@ Use this structure for future work. Keep UI behavior and business rules in small
 - Entitlements are derived on every read, never stored. A lapsed subscription
   downgrades itself even if no expiry job has run.
 - `null` means unlimited. Not `Infinity`, which JSON serializes to `null` anyway.
+- `src/services/billing.js` owns every subscription mutation. Nothing else writes
+  `plan`, `subscriptionStatus` or `subscriptionEndsAt`.
+- `Payment` is append-only. Treat the user's subscription fields as a cache of it.
 
 ## Rules For Future Changes
 

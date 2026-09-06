@@ -6,6 +6,8 @@ import { JobNotification } from "../models/JobNotification.js";
 import { Keyword } from "../models/Keyword.js";
 import User from "../models/User.js";
 import { getDeadlineMeta, getDeadlineWindow } from "../utils/jobView.js";
+import { sendBillingNoticeIfDue } from "./billingNotices.js";
+import { getLimits } from "./entitlements.js";
 import { evaluateNotificationDue } from "./notificationSchedule.js";
 import { fetchJobs } from "./scraper.js";
 import { describeTelegramError, sendTelegramMessage } from "./telegram.js";
@@ -264,17 +266,21 @@ function formatGroupedDigest(newJobs, keywords) {
 }
 
 /**
- * Jobs this user is watching that close within the reminder window and that the
- * user has not applied to yet.
+ * The reminder rungs that are due for this user right now.
  *
- * Applied state is read from `user.appliedJobs` rather than `Job.applied`: job rows
- * are shared between users, so the flag on the job says nothing about this user.
+ * A rung is due when the deadline has reached it and it has not been sent yet. That
+ * "has reached", rather than "equals", is what makes a missed run recoverable: if
+ * the T-3 rung could not be delivered and the job is now at T-2, the rung is still
+ * un-sent and still due, so it fires late instead of being silently skipped.
+ *
+ * Applied state comes from `user.appliedJobs`, never `Job.applied` — job rows are
+ * shared between users, so the flag on the job says nothing about this user.
  */
-export async function getJobsClosingSoonForUser(user, keywords, { days } = {}) {
-  const windowDays = days ?? env.deadlineReminderDays;
-  if (!user?._id || keywords.length === 0 || !(windowDays >= 0)) return [];
+export async function getDueDeadlineReminders(user, keywords, { stages } = {}) {
+  const ladder = stages ?? getLimits(user).reminderStages;
+  if (!user?._id || keywords.length === 0 || ladder.length === 0) return [];
 
-  const { from, to } = getDeadlineWindow(windowDays);
+  const { from, to } = getDeadlineWindow(Math.max(...ladder));
   const candidates = await Job.find({
     keywords: { $in: keywords },
     deadline: { $gte: from, $lte: to },
@@ -288,34 +294,55 @@ export async function getJobsClosingSoonForUser(user, keywords, { days } = {}) {
   const openJobs = candidates.filter((job) => !appliedJobIds.has(String(job._id)));
   if (openJobs.length === 0) return [];
 
-  const alreadyReminded = await DeadlineReminder.find({
+  const alreadySent = await DeadlineReminder.find({
     userId: user._id,
     jobId: { $in: openJobs.map((job) => job._id) },
   })
-    .select("jobId deadline")
+    .select("jobId deadline stage")
     .lean();
-  const remindedKeys = new Set(
-    alreadyReminded.map((entry) => `${entry.jobId}:${entry.deadline}`)
+  const sentKeys = new Set(
+    alreadySent.map((entry) => `${entry.jobId}:${entry.deadline}:${entry.stage}`)
   );
 
-  return openJobs.filter((job) => !remindedKeys.has(`${job._id}:${job.deadline}`));
+  const due = [];
+
+  for (const job of openJobs) {
+    const { daysUntilDeadline } = getDeadlineMeta(job.deadline);
+    if (daysUntilDeadline === null || daysUntilDeadline < 0) continue;
+
+    const dueStages = ladder.filter(
+      (stage) =>
+        daysUntilDeadline <= stage && !sentKeys.has(`${job._id}:${job.deadline}:${stage}`)
+    );
+
+    if (dueStages.length === 0) continue;
+
+    // A job that enters late can owe several rungs at once. They collapse into one
+    // message and are all recorded, so the user is never sent three notifications
+    // about the same job in the same minute.
+    due.push({ job, stages: dueStages, daysUntilDeadline });
+  }
+
+  return due;
 }
 
 /**
- * Builds the reminder and reports exactly which jobs made it into the text, so a
- * job trimmed by the length cap stays unreminded and reappears next run.
+ * Builds the reminder and reports exactly which entries made it into the text, so a
+ * job trimmed by the length cap stays un-recorded and reappears on the next run.
  */
-function formatDeadlineReminder(jobs) {
+function formatDeadlineReminder(entries) {
   const maxLength = 3600;
-  const includedJobIds = new Set();
+  const included = [];
   const lines = [
     "<b>Closing Soon</b>",
     "",
-    `${jobs.length} job${jobs.length === 1 ? "" : "s"} you have not applied to yet.`,
+    `${entries.length} job${entries.length === 1 ? "" : "s"} you have not applied to yet.`,
   ];
 
-  for (const job of jobs) {
-    const { daysUntilDeadline } = getDeadlineMeta(job.deadline);
+  for (const entry of entries) {
+    const { job, daysUntilDeadline } = entry;
+    // Labelled by the days actually remaining, not by the rung — a rung that fires
+    // late must not claim there are 3 days left when there are 2.
     const urgency =
       daysUntilDeadline === 0
         ? "last day"
@@ -333,35 +360,36 @@ function formatDeadlineReminder(jobs) {
     ];
 
     if ([...lines, ...jobLines].join("\n").length > maxLength) {
-      lines.push("", `...and ${jobs.length - includedJobIds.size} more closing soon.`);
+      lines.push("", `...and ${entries.length - included.length} more closing soon.`);
       break;
     }
 
     lines.push(...jobLines);
-    includedJobIds.add(String(job._id));
+    included.push(entry);
   }
 
-  lines.push("", "Mark a job as applied in the dashboard to stop its reminder.");
+  lines.push("", "Mark a job as applied in the dashboard to stop its reminders.");
 
-  return {
-    text: lines.join("\n"),
-    jobs: jobs.filter((job) => includedJobIds.has(String(job._id))),
-  };
+  return { text: lines.join("\n"), entries: included };
 }
 
-async function recordDeadlineReminders(userId, jobs) {
-  if (!userId || jobs.length === 0) return;
+async function recordDeadlineReminders(userId, entries) {
+  if (!userId || entries.length === 0) return;
+
+  const rows = entries.flatMap((entry) =>
+    entry.stages.map((stage) => ({
+      userId,
+      jobId: entry.job._id,
+      deadline: entry.job.deadline,
+      stage,
+      remindedAt: new Date(),
+    }))
+  );
+
+  if (rows.length === 0) return;
 
   try {
-    await DeadlineReminder.insertMany(
-      jobs.map((job) => ({
-        userId,
-        jobId: job._id,
-        deadline: job.deadline,
-        remindedAt: new Date(),
-      })),
-      { ordered: false }
-    );
+    await DeadlineReminder.insertMany(rows, { ordered: false });
   } catch (error) {
     // Duplicate keys just mean a concurrent run already recorded it.
     if (error.code !== 11000 && error.writeErrors?.some((item) => item.err?.code !== 11000)) {
@@ -418,6 +446,7 @@ export async function runDailyJobCheck({
   const newJobs = scrapeResult.jobs;
   const notificationErrors = [];
   const reminderErrors = [];
+  const billingNoticeErrors = [];
   const notifiedCounts = new Map();
   const remindedCounts = new Map();
 
@@ -480,15 +509,15 @@ export async function runDailyJobCheck({
       if (profile.user.deadlineRemindersEnabled === false) continue;
 
       try {
-        const closingJobs = await getJobsClosingSoonForUser(profile.user, profile.keywords);
-        if (closingJobs.length === 0) continue;
+        const dueReminders = await getDueDeadlineReminders(profile.user, profile.keywords);
+        if (dueReminders.length === 0) continue;
 
-        const reminder = formatDeadlineReminder(closingJobs);
+        const reminder = formatDeadlineReminder(dueReminders);
         await sendTelegramMessage(reminder.text, profile.user.telegramId);
-        // Recorded only after the send succeeds, and only for the jobs the text
+        // Recorded only after the send succeeds, and only for the entries the text
         // actually listed.
-        await recordDeadlineReminders(profile.user._id, reminder.jobs);
-        remindedCounts.set(String(profile.user._id), reminder.jobs.length);
+        await recordDeadlineReminders(profile.user._id, reminder.entries);
+        remindedCounts.set(String(profile.user._id), reminder.entries.length);
       } catch (error) {
         // Non-fatal on purpose. Nothing was recorded, so these jobs are retried on
         // the next run while they remain inside the window; failing the whole slot
@@ -498,6 +527,19 @@ export async function runDailyJobCheck({
         console.error("Deadline reminder failed:", {
           userId: String(profile.user._id),
           chatId: profile.user.telegramId,
+          message,
+        });
+      }
+
+      try {
+        await sendBillingNoticeIfDue(profile.user);
+      } catch (error) {
+        // Non-fatal, same reasoning as the deadline reminder: nothing was recorded,
+        // so the rung is still owed and fires on the next run.
+        const message = describeTelegramError(error);
+        billingNoticeErrors.push({ userId: profile.user._id, message });
+        console.error("Billing notice failed:", {
+          userId: String(profile.user._id),
           message,
         });
       }
@@ -521,6 +563,7 @@ export async function runDailyJobCheck({
     notificationErrors,
     reminderError: reminderErrors[0]?.message ?? null,
     reminderErrors,
+    billingNoticeErrors,
     jobs: newJobs,
   };
 }

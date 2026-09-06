@@ -1,8 +1,10 @@
 import mongoose from "mongoose";
 import dns from "node:dns";
 import { env } from "./config/env.js";
+import { BillingReminder } from "./models/BillingReminder.js";
 import { DeadlineReminder } from "./models/DeadlineReminder.js";
 import { JobNotification } from "./models/JobNotification.js";
+import { Payment } from "./models/Payment.js";
 import { TelegramLinkToken } from "./models/TelegramLinkToken.js";
 import { Keyword } from "./models/Keyword.js";
 import User from "./models/User.js";
@@ -22,9 +24,12 @@ export async function connectDb() {
   mongoose.set("strictQuery", true);
   await mongoose.connect(env.mongodbUri);
   await dropLegacyKeywordIndexes();
+  await dropLegacyDeadlineReminderIndexes();
   await Keyword.createIndexes();
   await JobNotification.createIndexes();
   await DeadlineReminder.createIndexes();
+  await Payment.createIndexes();
+  await BillingReminder.createIndexes();
   await TelegramLinkToken.createIndexes();
 
   // A pre-existing duplicate telegramId would make this throw; that must not take
@@ -54,6 +59,28 @@ export async function ensureDbReady() {
     dbReadyPromise = initDbConnection();
   }
   await dbReadyPromise;
+}
+
+/**
+ * The reminder ledger was keyed (user, job, deadline) before the ladder existed.
+ * That index is unique, so leaving it in place would reject the second rung of
+ * every ladder. Mongoose creates new indexes but never drops superseded ones.
+ */
+async function dropLegacyDeadlineReminderIndexes() {
+  try {
+    const collection = mongoose.connection.collection("deadlinereminders");
+    const indexes = await collection.indexes();
+    const legacyIndex = indexes.find((index) => index.name === "userId_1_jobId_1_deadline_1");
+
+    if (legacyIndex) {
+      await collection.dropIndex(legacyIndex.name);
+      console.log(`Dropped legacy deadline reminder index: ${legacyIndex.name}`);
+    }
+  } catch (error) {
+    if (error.code !== 26 && error.codeName !== "NamespaceNotFound") {
+      throw error;
+    }
+  }
 }
 
 async function dropLegacyKeywordIndexes() {

@@ -1,4 +1,4 @@
-import { Check, LogOut, ShieldCheck, User, Users } from "lucide-react";
+import { Check, CreditCard, LogOut, Receipt, ShieldCheck, User, Users } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { ThemeToggle } from "./ThemeToggle.jsx";
@@ -24,6 +24,11 @@ export function AppLayout({ appliedCount, onLogout }) {
             Applied Jobs
             <span className="nav-count">{appliedCount}</span>
           </NavLink>
+          <NavLink to="/billing">
+            <CreditCard size={18} />
+            Billing
+            {!entitlements.isPaid && <span className="nav-count nav-count--accent">Free</span>}
+          </NavLink>
         </nav>
 
         {user?.role === "admin" && (
@@ -35,6 +40,10 @@ export function AppLayout({ appliedCount, onLogout }) {
             <NavLink to="/admin/users">
               <Users size={18} />
               Users
+            </NavLink>
+            <NavLink to="/admin/payments">
+              <Receipt size={18} />
+              Payments
             </NavLink>
           </nav>
         )}

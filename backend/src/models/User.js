@@ -91,6 +91,16 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Daily manual-scan allowance, as a calendar day in the app timezone plus a
+    // counter. Reset lazily when a scan lands on a new day.
+    manualScanDay: {
+      type: String,
+      default: null,
+    },
+    manualScanCount: {
+      type: Number,
+      default: 0,
+    },
     plan: {
       type: String,
       enum: ["free", "pro", "team"],
@@ -102,6 +112,17 @@ const userSchema = new mongoose.Schema(
       default: "free",
     },
     subscriptionEndsAt: {
+      type: Date,
+      default: null,
+    },
+    // Keeps an established subscriber on their plan while an admin verifies a
+    // renewal, so verification lag never cuts off someone who has already paid.
+    // Set only for users with a previously approved payment.
+    subscriptionHoldPlan: {
+      type: String,
+      default: null,
+    },
+    subscriptionHoldUntil: {
       type: Date,
       default: null,
     },

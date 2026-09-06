@@ -7,7 +7,8 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "seed:admin": "node src/scripts/seedAdmin.js",
-    "telegram:webhook": "node src/scripts/setTelegramWebhook.js"
+    "telegram:webhook": "node src/scripts/setTelegramWebhook.js",
+    "expire:subs": "node src/scripts/expireSubscriptions.js"
   },
   "dependencies": {
     "axios": "^1.7.9",

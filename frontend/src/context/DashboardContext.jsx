@@ -14,6 +14,25 @@ export function DashboardProvider({ children }) {
   const [running, setRunning] = useState(false);
   const [busyMessage, setBusyMessage] = useState("");
   const [status, setStatus] = useState("");
+  // Set when the backend answers 402, so the UI can offer an upgrade rather than
+  // showing a plan limit as a generic failure.
+  const [planLimit, setPlanLimit] = useState(null);
+
+  // A 402 carries its own explanation; anything else is a plain error.
+  function reportError(error) {
+    if (error.isPlanLimit) {
+      setPlanLimit({
+        message: error.message,
+        feature: error.feature,
+        limit: error.limit,
+      });
+      setStatus("");
+      return;
+    }
+
+    setPlanLimit(null);
+    setStatus(error.message);
+  }
 
   async function loadKeywords() {
     const data = await apiFetch("/api/keywords");
@@ -54,6 +73,7 @@ export function DashboardProvider({ children }) {
     if (!value) return;
 
     setBusyMessage("Searching jobs");
+    setPlanLimit(null);
     try {
       const data = await apiFetch("/api/keywords", {
         method: "POST",
@@ -71,7 +91,7 @@ export function DashboardProvider({ children }) {
             }.`
       );
     } catch (error) {
-      setStatus(error.message);
+      reportError(error);
     } finally {
       setBusyMessage("");
     }
@@ -122,6 +142,7 @@ export function DashboardProvider({ children }) {
     setRunning(true);
     setBusyMessage("Running job check");
     setStatus("");
+    setPlanLimit(null);
     try {
       const data = await apiFetch("/api/run-daily", {
         method: "POST",
@@ -130,13 +151,16 @@ export function DashboardProvider({ children }) {
       setStatus(
         `Checked ${data.found} jobs for ${data.keywords.length} keywords. New: ${data.new}.` +
           (data.closingSoon ? ` Closing soon: ${data.closingSoon}.` : "") +
+          (data.scanQuota && data.scanQuota.limit
+            ? ` Scans left today: ${data.scanQuota.remaining}.`
+            : "") +
           (data.notificationError ? ` Telegram: ${data.notificationError}` : "") +
           (data.reminderError ? ` Reminder: ${data.reminderError}` : "")
       );
       await loadKeywords();
       await refreshJobs();
     } catch (error) {
-      setStatus(error.message);
+      reportError(error);
     } finally {
       setRunning(false);
       setBusyMessage("");
@@ -151,6 +175,7 @@ export function DashboardProvider({ children }) {
     setNewKeyword("");
     setLoading(false);
     setRunning(false);
+    setPlanLimit(null);
     setBusyMessage("");
     setStatus("");
   }
@@ -169,6 +194,8 @@ export function DashboardProvider({ children }) {
     setStatus,
     loadKeywords,
     refreshJobs,
+    planLimit,
+    setPlanLimit,
     addKeyword,
     removeKeyword,
     selectKeyword,

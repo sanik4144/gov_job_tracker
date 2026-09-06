@@ -4,6 +4,7 @@ import { env, requireEnv } from "./config/env.js";
 import { initDbConnection } from "./db.js";
 import adminRouter from "./routes/adminRouter.js";
 import authRouter from "./routes/authRouter.js";
+import billingRouter from "./routes/billingRouter.js";
 import jobRouter from "./routes/jobRouter.js";
 import keywordRouter from "./routes/keywordRouter.js";
 import runCheckRouter from "./routes/runCheckRouter.js";
@@ -41,6 +42,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/billing", billingRouter);
 app.use("/api/keywords", keywordRouter);
 app.use("/api/jobs", jobRouter);
 app.use("/api/run-daily", runCheckRouter);

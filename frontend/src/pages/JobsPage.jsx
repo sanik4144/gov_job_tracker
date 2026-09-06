@@ -1,9 +1,12 @@
 import { Bell, RefreshCcw } from "lucide-react";
 import { JobList } from "../components/JobList.jsx";
+import { PlanLimitNotice } from "../components/PlanLimitNotice.jsx";
 import { JobMetrics } from "../components/JobMetrics.jsx";
 import { KeywordPanel } from "../components/KeywordPanel.jsx";
 import { StatusMessage } from "../components/StatusMessage.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 import { useDashboard } from "../context/DashboardContext.jsx";
+import { describeLimit, isUnlimited } from "../utils/plan.js";
 
 export function JobsPage({ onOpenPdf }) {
   const {
@@ -22,7 +25,15 @@ export function JobsPage({ onOpenPdf }) {
     selectKeyword,
     toggleApplied,
     runCheck,
+    planLimit,
+    setPlanLimit,
   } = useDashboard();
+  const { entitlements } = useAuth();
+  const keywordLimit = entitlements.limits.keywords;
+  // Never gate on the placeholder entitlements, or the control flashes disabled on
+  // every page load before /me answers.
+  const atKeywordLimit =
+    entitlements.isResolved && !isUnlimited(keywordLimit) && keywords.length >= keywordLimit;
 
   return (
     <>
@@ -56,8 +67,13 @@ export function JobsPage({ onOpenPdf }) {
       />
 
       <StatusMessage message={status} />
+      <PlanLimitNotice limit={planLimit} onDismiss={() => setPlanLimit(null)} />
 
       <KeywordPanel
+        usage={
+          entitlements.isResolved ? `${keywords.length} / ${describeLimit(keywordLimit)}` : ""
+        }
+        atLimit={atKeywordLimit}
         keywords={keywords}
         newKeyword={newKeyword}
         selectedKeyword={selectedKeyword}

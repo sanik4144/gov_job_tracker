@@ -7,7 +7,9 @@ import {
   createLinkToken,
   unlinkTelegram,
 } from '../services/telegramLink.js';
+import { can, getLimits } from '../services/entitlements.js';
 import { buildUserPayload } from '../utils/userView.js';
+import { sendFeatureLocked } from '../utils/planErrors.js';
 
 function createToken(user) {
   return jwt.sign({ userId: user._id.toString(), role: user.role }, env.jwtSecret, {
@@ -131,10 +133,28 @@ export const updateProfile = async (req, res) => {
     req.user.deadlineRemindersEnabled = Boolean(req.body.deadlineRemindersEnabled);
   }
 
+  const limits = getLimits(req.user);
+
   if (Object.prototype.hasOwnProperty.call(req.body, "notificationFrequency")) {
     if (!["daily", "weekly"].includes(req.body.notificationFrequency)) {
       return res.status(400).json({ message: "Notification frequency must be daily or weekly" });
     }
+
+    // Rejected here for a clear message; the notifier enforces it again at send
+    // time, which is what actually protects the plan.
+    //
+    // Only a *change* is rejected. The profile form posts every field, so a lapsed
+    // Pro whose record still says "weekly" must be able to save an unrelated edit —
+    // the notifier already downgrades their actual delivery to daily.
+    const frequencyChanged = req.body.notificationFrequency !== req.user.notificationFrequency;
+
+    if (frequencyChanged && req.body.notificationFrequency === "weekly" && !can(req.user, "weeklyDigest")) {
+      return sendFeatureLocked(res, {
+        feature: "weeklyDigest",
+        message: "Weekly digests are a Pro feature. Upgrade to schedule one.",
+      });
+    }
+
     req.user.notificationFrequency = req.body.notificationFrequency;
   }
 
@@ -142,6 +162,19 @@ export const updateProfile = async (req, res) => {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(req.body.notificationTime)) {
       return res.status(400).json({ message: "Notification time must be in HH:mm format" });
     }
+
+    // A fixed-time plan accepts the plan's own time, and accepts the value already
+    // stored — re-saving an unrelated field must never fail. Anything else is a
+    // change the plan does not allow.
+    const timeChanged = req.body.notificationTime !== req.user.notificationTime;
+
+    if (limits.notificationTime && timeChanged && req.body.notificationTime !== limits.notificationTime) {
+      return sendFeatureLocked(res, {
+        feature: "customNotificationTime",
+        message: `Free digests are sent at ${limits.notificationTime}. Upgrade to Pro to choose your own time.`,
+      });
+    }
+
     req.user.notificationTime = req.body.notificationTime;
   }
 

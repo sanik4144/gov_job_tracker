@@ -2,6 +2,8 @@ import { Plus, Search, X } from "lucide-react";
 import { useState } from "react";
 
 export function KeywordPanel({
+  usage,
+  atLimit,
   keywords,
   newKeyword,
   selectedKeyword,
@@ -48,6 +50,7 @@ export function KeywordPanel({
       </div>
 
       <div className="keyword-add-row">
+        {usage && <span className="keyword-usage">{usage} keywords</span>}
         {isAdding ? (
           <form onSubmit={handleAdd}>
             <Search size={16} />
@@ -71,7 +74,13 @@ export function KeywordPanel({
             </button>
           </form>
         ) : (
-          <button type="button" className="kw-add" onClick={() => setIsAdding(true)}>
+          <button
+            type="button"
+            className="kw-add"
+            onClick={() => setIsAdding(true)}
+            disabled={atLimit}
+            title={atLimit ? "Your plan's keyword limit is reached" : "Add a keyword"}
+          >
             <Plus size={14} />
             New keyword
           </button>

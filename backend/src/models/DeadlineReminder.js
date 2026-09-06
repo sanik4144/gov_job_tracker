@@ -30,6 +30,12 @@ const deadlineReminderSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    // Which rung of the plan's ladder this was: days before the deadline, 0 being
+    // the last day. Part of the key so a job can be reminded at 3, then 1, then 0.
+    stage: {
+      type: Number,
+      required: true,
+    },
     remindedAt: {
       type: Date,
       default: Date.now,
@@ -39,6 +45,6 @@ const deadlineReminderSchema = new mongoose.Schema(
 );
 
 // Also the idempotency guard: pressing Run Scan twice cannot double-send a reminder.
-deadlineReminderSchema.index({ userId: 1, jobId: 1, deadline: 1 }, { unique: true });
+deadlineReminderSchema.index({ userId: 1, jobId: 1, deadline: 1, stage: 1 }, { unique: true });
 
 export const DeadlineReminder = mongoose.model("DeadlineReminder", deadlineReminderSchema);

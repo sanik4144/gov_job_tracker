@@ -40,13 +40,15 @@ export const env = {
   // How far back a user's first digest may reach. Bounds the backlog a brand-new
   // user (or a newly added keyword) pulls in on its first delivery.
   notificationJobLookbackDays: Number(process.env.NOTIFICATION_JOB_LOOKBACK_DAYS || 14),
-  // How many days ahead of a deadline the "closing soon" reminder fires. Each job
-  // is reminded once per deadline, the first time it enters this window.
-  deadlineReminderDays: Number(process.env.DEADLINE_REMINDER_DAYS || 3),
   // Days a lapsed paid plan keeps working after its end date. This exists to absorb
   // the lag between a user sending payment and an admin verifying it manually, not
   // to extend the subscription.
   subscriptionGraceDays: Number(process.env.SUBSCRIPTION_GRACE_DAYS || 3),
+  // How long a submitted-but-unverified renewal keeps an existing subscriber on
+  // their plan while an admin checks the transaction.
+  paymentHoldDays: Number(process.env.PAYMENT_HOLD_DAYS || 3),
+  // The bKash number shown on the billing page for manual payments.
+  bkashNumber: process.env.BKASH_NUMBER || "",
   timezone: process.env.TZ || "Asia/Dhaka",
   frontendOrigins: (process.env.FRONTEND_ORIGIN || defaultFrontendOrigins.join(","))
     .split(",")

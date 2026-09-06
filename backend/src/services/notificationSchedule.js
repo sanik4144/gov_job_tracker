@@ -1,3 +1,5 @@
+import { getLimits } from "./entitlements.js";
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function getZonedParts(date, timezone) {
@@ -66,11 +68,24 @@ function parseNotificationTime(value) {
   return { hour: Number(match[1]), minute: Number(match[2]) };
 }
 
+/**
+ * The schedule a user is actually entitled to, which is not always the one stored
+ * on their record.
+ *
+ * The plan decides here rather than at write time because this path never passes
+ * through Express: a lapsed Pro keeps "weekly" and a custom time on their document,
+ * and must fall back to the free schedule without anything having to rewrite it.
+ */
 export function getNotificationSettings(user) {
+  const limits = getLimits(user);
+  const requested = user.notificationFrequency === "weekly" ? "weekly" : "daily";
+  const frequency = limits.notificationFrequencies.includes(requested) ? requested : "daily";
+
   return {
     enabled: user.notificationsEnabled ?? true,
-    frequency: user.notificationFrequency === "weekly" ? "weekly" : "daily",
-    ...parseNotificationTime(user.notificationTime),
+    frequency,
+    // A non-null limit is a fixed delivery time; null means the user picks.
+    ...parseNotificationTime(limits.notificationTime || user.notificationTime),
     dayOfWeek: Number.isInteger(user.notificationDayOfWeek) ? user.notificationDayOfWeek : 0,
   };
 }
