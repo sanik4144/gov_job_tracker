@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { ThemeToggle } from "./ThemeToggle.jsx";
 
 export function AppLayout({ appliedCount, onLogout }) {
-  const { user } = useAuth();
+  const { user, entitlements } = useAuth();
 
   return (
     <main className="app-shell">
@@ -46,7 +46,7 @@ export function AppLayout({ appliedCount, onLogout }) {
             </span>
             <span className="account-meta">
               <strong>{user?.name || "Account"}</strong>
-              <span>{user?.plan || "free"} plan</span>
+              <span>{entitlements.label} plan</span>
             </span>
           </NavLink>
 

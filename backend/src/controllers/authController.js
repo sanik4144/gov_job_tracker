@@ -7,6 +7,7 @@ import {
   createLinkToken,
   unlinkTelegram,
 } from '../services/telegramLink.js';
+import { buildUserPayload } from '../utils/userView.js';
 
 function createToken(user) {
   return jwt.sign({ userId: user._id.toString(), role: user.role }, env.jwtSecret, {
@@ -18,7 +19,7 @@ function sendAuthResponse(res, user, message = 'Authenticated successfully', sta
   return res.status(status).json({
     message,
     token: createToken(user),
-    user: user.toSafeJSON(),
+    user: buildUserPayload(user),
   });
 }
 
@@ -94,7 +95,7 @@ export const loginUser = async (req, res) => {
 };
 
 export const getCurrentUser = async (req, res) => {
-  return res.json({ user: req.user.toSafeJSON() });
+  return res.json({ user: buildUserPayload(req.user) });
 };
 
 export const updateProfile = async (req, res) => {
@@ -162,7 +163,7 @@ export const updateProfile = async (req, res) => {
     await req.user.save();
     return res.json({
       message: "Profile updated successfully",
-      user: req.user.toSafeJSON(),
+      user: buildUserPayload(req.user),
     });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error: error.message });
@@ -190,7 +191,7 @@ export const disconnectTelegram = async (req, res) => {
 
     return res.json({
       message: "Telegram disconnected",
-      user: req.user.toSafeJSON(),
+      user: buildUserPayload(req.user),
     });
   } catch (error) {
     return res.status(500).json({ message: "Server error", error: error.message });

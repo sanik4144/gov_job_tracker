@@ -43,6 +43,10 @@ export const env = {
   // How many days ahead of a deadline the "closing soon" reminder fires. Each job
   // is reminded once per deadline, the first time it enters this window.
   deadlineReminderDays: Number(process.env.DEADLINE_REMINDER_DAYS || 3),
+  // Days a lapsed paid plan keeps working after its end date. This exists to absorb
+  // the lag between a user sending payment and an admin verifying it manually, not
+  // to extend the subscription.
+  subscriptionGraceDays: Number(process.env.SUBSCRIPTION_GRACE_DAYS || 3),
   timezone: process.env.TZ || "Asia/Dhaka",
   frontendOrigins: (process.env.FRONTEND_ORIGIN || defaultFrontendOrigins.join(","))
     .split(",")

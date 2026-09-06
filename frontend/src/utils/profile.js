@@ -1,11 +1,11 @@
 export const DAYS_OF_WEEK = [
+  "Saturday",
   "Sunday",
   "Monday",
   "Tuesday",
   "Wednesday",
   "Thursday",
   "Friday",
-  "Saturday",
 ];
 
 // Mirrors the backend DEADLINE_REMINDER_DAYS default. Display only — the backend

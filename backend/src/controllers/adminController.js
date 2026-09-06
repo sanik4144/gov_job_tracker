@@ -1,6 +1,7 @@
 import { ensureDbReady } from "../db.js";
 import { Keyword } from "../models/Keyword.js";
 import User from "../models/User.js";
+import { buildUserPayload } from "../utils/userView.js";
 
 export async function listUsers(req, res, next) {
   try {
@@ -16,7 +17,7 @@ export async function listUsers(req, res, next) {
 
     res.json({
       users: users.map((user) => ({
-        ...user.toSafeJSON(),
+        ...buildUserPayload(user),
         keywordCount: keywordCountByUserId.get(user._id.toString()) || 0,
         appliedJobCount: user.appliedJobs?.length || 0,
       })),

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState } from "react";
 import { AUTH_STORAGE_KEY, request } from "../api/client.js";
 import { buildProfileForm } from "../utils/profile.js";
+import { resolveEntitlements } from "../utils/plan.js";
 
 const AuthContext = createContext(null);
 
@@ -35,9 +36,14 @@ export function AuthProvider({ children }) {
     });
   }
 
+  // Derived from the user payload, so every place that already calls setUser gets
+  // fresh entitlements for free.
+  const entitlements = resolveEntitlements(user);
+
   const value = {
     token,
     user,
+    entitlements,
     setUser,
     profileForm,
     setProfileForm,

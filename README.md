@@ -26,6 +26,28 @@ listing jobs that match the user's keywords, close within `DEADLINE_REMINDER_DAY
   (user, job, deadline), which is also the idempotency guard — pressing Run Scan
   twice cannot double-send.
 
+## Plans
+
+| Lever | Free | Pro (BDT 99 / 30 days) |
+| --- | --- | --- |
+| Keywords | 2 | Unlimited |
+| Digest time | Fixed 21:00 | Any time |
+| Digest frequency | Daily | Daily + weekly |
+| Deadline reminders | Last day only | 3 days, 1 day, last day |
+| Manual Run Scan | 1/day | 10/day |
+
+Limits live in `backend/src/config/plans.js` and are resolved by
+`backend/src/services/entitlements.js`, the only module that reads `user.plan`. Every
+authenticated response embeds the resolved `entitlements` inside the `user` object,
+so the frontend never computes a limit itself.
+
+A paid plan stays active while `subscriptionStatus` is live **and**
+`subscriptionEndsAt` has not passed by more than `SUBSCRIPTION_GRACE_DAYS`. Grace
+covers the lag between a user sending payment and an admin verifying it manually;
+`canceled` is an explicit revocation and gets no grace.
+
+Nothing is enforced yet - limits are published to the client but not applied.
+
 ## Render Free Tier Note
 
 Render free web services can sleep after inactivity. While the service is asleep, an in-process `node-cron` schedule will not run. For reliable free-tier daily alerts, use an external scheduler to call:
